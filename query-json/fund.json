@@ -1,0 +1,16 @@
+{
+    "name": "Horizonte Cr\u00c3\u00a9dito Multirrede FIDC \u00e2\u20ac\u201d Piloto XDC",
+    "fidcId": "2",
+    "fundId": "be6f2e8a-5474-43c7-a692-7918c37e3f42",
+    "chainId": "51",
+    "network": "XDC",
+    "createdAt": "2026-09-12T19:38:29.274491+00:00",
+    "profileId": "xdc-apothem",
+    "genesisHash": "0xbdea512b4f12ff1135ec92c00dc047ffb93890c2ea1aa0eefe9b013d80640075",
+    "stableSymbol": "BRL-CVM",
+    "stableAddress": "0x243e98638D619eB6f10eaBbaCfC071f318D5e9d0",
+    "creationTxHash": "0x14621df8a3245e876448ce96d475988f44f7dca038a1bc666ed189a0f204682c",
+    "stableDecimals": 18,
+    "contractAddress": "0x8001BB21f4F061b444F02f50Ab76BAA6a84394A2",
+    "creationIntentHash": "0x8dc7a22b8af76d37a58ebb5841e06010848186c39fa74fb4989c3182d121cba1"
+}

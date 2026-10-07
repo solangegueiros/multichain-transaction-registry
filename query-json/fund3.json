@@ -1,0 +1,16 @@
+{
+    "name": "Capitare DEV Polygon \u00e2\u20ac\u201d Conectores Multirrede",
+    "fidcId": "17",
+    "fundId": "af5b7014-d16f-4494-ab99-130fdda864b6",
+    "chainId": "80002",
+    "network": "POLYGON",
+    "createdAt": "2026-09-30T21:03:21.62084+00:00",
+    "profileId": "polygon-amoy",
+    "genesisHash": "0x7202b2b53c5a0836e773e319d18922cc756dd67432f9a1f65352b61f4406c697",
+    "stableSymbol": "BRL1",
+    "stableAddress": "0x25fC15B20F67049249FF70BB8A846e66BE07693C",
+    "creationTxHash": "0x8c4848bd81c36f35b95e4c1d3a23a5b7f43a91ee6ff0ae716e83d5c4fbfb6732",
+    "stableDecimals": 18,
+    "contractAddress": "0xbda857B90B453ff9c4826d368beBa4B1D92a35b4",
+    "creationIntentHash": "0xbce29f85c97eaaca38d33e1f97a7ffcbeecd9e612817393c4a2ab2f5f410b7f5"
+}

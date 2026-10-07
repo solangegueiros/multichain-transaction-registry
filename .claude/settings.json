@@ -1,0 +1,5 @@
+{
+  "env": {
+    "HARDHAT_DISABLE_TELEMETRY_PROMPT": "true"
+  }
+}

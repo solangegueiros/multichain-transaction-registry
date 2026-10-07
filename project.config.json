@@ -1,0 +1,8 @@
+{
+  "rpcUrl": "https://ethereum-sepolia-rpc.publicnode.com",
+  "multiChainTxRegistryAddress": "",
+  "fundRegistryAddress": "",
+  "orderRegistryAddress": "",
+  "creForwarderAddress": "",
+  "multiChainTxReceiverAddress": ""
+}

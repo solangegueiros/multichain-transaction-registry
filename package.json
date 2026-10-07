@@ -1,0 +1,17 @@
+{
+  "name": "multichain-tx-registry-root",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Root shortcuts: each script forwards to the part of the project it belongs to.",
+  "scripts": {
+    "postinstall": "cd smart-contracts && npm install",
+    "test": "npm run contracts:test --",
+    "contracts:install": "cd smart-contracts && npm install",
+    "contracts:compile": "cd smart-contracts && npm run compile --",
+    "contracts:test": "cd smart-contracts && npm test --",
+    "contracts:deploy": "cd smart-contracts && npm run deploy --",
+    "contracts:deploy-cre-receiver": "cd smart-contracts && npm run deploy-cre-receiver --",
+    "contracts:register-chains": "cd smart-contracts && npm run register-chains --",
+    "contracts:register-stablecoins": "cd smart-contracts && npm run register-stablecoins --"
+  }
+}

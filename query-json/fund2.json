@@ -1,0 +1,16 @@
+{
+    "name": "Multiplica Capital - BlackRock FIDC",
+    "fidcId": "3",
+    "fundId": "6c1f2c8c-355b-46de-a96d-85d8e70f6fa8",
+    "chainId": "51",
+    "network": "XDC",
+    "createdAt": "2026-09-21T10:59:34.504554+00:00",
+    "profileId": "xdc-apothem",
+    "genesisHash": "0xbdea512b4f12ff1135ec92c00dc047ffb93890c2ea1aa0eefe9b013d80640075",
+    "stableSymbol": "BRL-CVM",
+    "stableAddress": "0x243e98638D619eB6f10eaBbaCfC071f318D5e9d0",
+    "creationTxHash": "0x3366e2219c4da96312ee254cde1d011a00103953b0ab0089ddc395d6f5516d1f",
+    "stableDecimals": 18,
+    "contractAddress": "0x8d9aC9f2FC551276805a30aB2b387C1Bf1CF7f80",
+    "creationIntentHash": "0xcfc8551e6ca997412a75c16f027208ae7bb4893f8d317e18ec8d916bf767be9f"
+}

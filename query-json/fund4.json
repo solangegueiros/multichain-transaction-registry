@@ -1,0 +1,16 @@
+{
+    "name": "Aurora Cr\u00c3\u00a9dito Multirrede \u00e2\u20ac\u201d XDC Mainnet DEV",
+    "fidcId": "1",
+    "fundId": "a3cdcb8e-4197-413f-87c1-9a1bc793a666",
+    "chainId": "50",
+    "network": "XDC",
+    "createdAt": "2026-10-02T13:58:32.98306+00:00",
+    "profileId": "xdc-mainnet",
+    "genesisHash": "0x4a9d748bd78a8d0385b67788c2435dcdb914f98a96250b68863a1f8b7642d6b1",
+    "stableSymbol": "BRL-CVM-DEV",
+    "stableAddress": "0x490590Eab907C4aF8aF845049FC7ac2F97e535F6",
+    "creationTxHash": "0xf8474985ac7c20d80be2a79858c02d11f7a93bd4d27d62a2e48e1f53ef955129",
+    "stableDecimals": 18,
+    "contractAddress": "0x28BBC27D782025EE0790fA2bA05955A56a142b94",
+    "creationIntentHash": "0x0ed2fe4813e05dc910f2134a86def61bc746cf0af6c731f588a1c5b3f7c796e9"
+}
