@@ -2,6 +2,7 @@ import { network } from "hardhat";
 import { projectConfig } from "../project-config.js";
 import { assertPrivateKey } from "./lib/check-env.js";
 import { CHAINS } from "./lib/chains.js";
+import { sendTx } from "./lib/send-tx.js";
 
 // Registers in FundRegistry the stablecoins used by the funds.
 //
@@ -96,8 +97,7 @@ if (!(await fundRegistry.hasRole(OPERATOR_ROLE, signer.address))) {
     );
   }
 
-  const tx = await fundRegistry.grantRole(OPERATOR_ROLE, signer.address);
-  await tx.wait();
+  const tx = await sendTx(() => fundRegistry.grantRole(OPERATOR_ROLE, signer.address));
   console.log(`The signer is an admin of FundRegistry and was not an operator: granted OPERATOR_ROLE, tx ${tx.hash}`);
 }
 
@@ -121,8 +121,7 @@ for (const coin of STABLECOINS) {
     continue;
   }
 
-  const tx = await fundRegistry.registerStableCoin(chainId, coin.tokenAddress, coin.symbol, coin.decimals);
-  await tx.wait();
+  const tx = await sendTx(() => fundRegistry.registerStableCoin(chainId, coin.tokenAddress, coin.symbol, coin.decimals));
 
   console.log(`- ${label}: registered, ${coin.decimals} decimals, tx ${tx.hash}`);
 }

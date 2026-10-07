@@ -2,6 +2,7 @@ import { network } from "hardhat";
 import { projectConfig } from "../project-config.js";
 import { assertPrivateKey } from "./lib/check-env.js";
 import { CHAINS, SCHEMA_KEYS_BY_NETWORK } from "./lib/chains.js";
+import { sendTx } from "./lib/send-tx.js";
 
 const SCHEMA_KEYS = SCHEMA_KEYS_BY_NETWORK.flatMap(({ network, keys }) =>
   keys.map((k) => ({ network, ...k, required: false })),
@@ -37,14 +38,13 @@ for (const chain of CHAINS) {
     continue;
   }
 
-  const tx = await registry.registerChain(
+  const tx = await sendTx(() => registry.registerChain(
     chain.network,
     chain.networkChainId,
     chain.name,
     chain.profileId,
     chain.genesisHash,
-  );
-  await tx.wait();
+  ));
 
   console.log(`- ${chain.network}: registered (${chainId}) tx ${tx.hash}`);
 }
@@ -63,14 +63,13 @@ for (const item of SCHEMA_KEYS) {
     continue;
   }
 
-  const tx = await registry.registerSchemaKey(
+  const tx = await sendTx(() => registry.registerSchemaKey(
     item.network,
     key,
     item.valueType,
     item.description,
     item.required,
-  );
-  await tx.wait();
+  ));
 
   console.log(`- ${item.network} / ${item.key}: registered (${item.valueType}) tx ${tx.hash}`);
 }

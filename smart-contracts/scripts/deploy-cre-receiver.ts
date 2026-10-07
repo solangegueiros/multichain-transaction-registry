@@ -2,6 +2,7 @@ import hre from "hardhat";
 import { verifyContract } from "@nomicfoundation/hardhat-verify/verify";
 import { assertPrivateKey } from "./lib/check-env.js";
 import { projectConfig, saveProjectConfig } from "../project-config.js";
+import { sendTx } from "./lib/send-tx.js";
 
 // Deploys MultiChainTxReceiver, the entry point of Chainlink CRE workflows, and keeps
 // its configuration in line with project.config.json (repository root): the forwarder,
@@ -161,8 +162,7 @@ if (same(currentForwarder, wantedForwarder)) {
   // it must not put a production receiver back on the simulation forwarder.
   console.log("\ncreForwarderAddress is empty in project.config.json: the forwarder of the receiver was left as it is.");
 } else if (deployerIsReceiverAdmin) {
-  const tx = await receiver.setForwarderAddress(wantedForwarder);
-  await tx.wait();
+  const tx = await sendTx(() => receiver.setForwarderAddress(wantedForwarder));
   console.log(`\nForwarder changed from ${currentForwarder} to ${wantedForwarder}, tx ${tx.hash}`);
   currentForwarder = wantedForwarder;
 } else {
@@ -209,8 +209,7 @@ for (const target of targets) {
   } else if (same(current, target.wanted)) {
     // nothing to do
   } else if (deployerIsReceiverAdmin) {
-    const tx = await target.set(target.wanted);
-    await tx.wait();
+    const tx = await sendTx(() => target.set(target.wanted));
     console.log(`${target.name}: receiver pointed to ${target.wanted}, tx ${tx.hash}`);
     current = target.wanted;
   } else {
@@ -230,8 +229,7 @@ for (const target of targets) {
     console.log(`${target.name} ${current}: OPERATOR_ROLE already granted`);
     linked.push(`${target.name}: ${current}`);
   } else if (await registry.hasRole(await registry.DEFAULT_ADMIN_ROLE(), deployer.address)) {
-    const tx = await registry.grantRole(OPERATOR_ROLE, receiverAddress);
-    await tx.wait();
+    const tx = await sendTx(() => registry.grantRole(OPERATOR_ROLE, receiverAddress));
     console.log(`${target.name} ${current}: OPERATOR_ROLE granted, tx ${tx.hash}`);
     linked.push(`${target.name}: ${current}`);
   } else {
@@ -249,8 +247,7 @@ const RELAYER_ROLE = await txRegistry.RELAYER_ROLE();
 if (await txRegistry.hasRole(RELAYER_ROLE, receiverAddress)) {
   console.log("\nRELAYER_ROLE in MultiChainTxRegistry: already granted");
 } else if (await txRegistry.hasRole(await txRegistry.DEFAULT_ADMIN_ROLE(), deployer.address)) {
-  const tx = await txRegistry.grantRole(RELAYER_ROLE, receiverAddress);
-  await tx.wait();
+  const tx = await sendTx(() => txRegistry.grantRole(RELAYER_ROLE, receiverAddress));
   console.log(`\nRELAYER_ROLE in MultiChainTxRegistry: granted, tx ${tx.hash}`);
 } else {
   console.log("\nRELAYER_ROLE in MultiChainTxRegistry: NOT granted");

@@ -8,6 +8,7 @@ import {
   type AddressKey,
   type ProjectConfig,
 } from "../project-config.js";
+import { sendTx } from "../scripts/lib/send-tx.js";
 
 // Action of the `deploy` task (declared in hardhat.config.ts).
 //
@@ -265,8 +266,7 @@ export default async function deploy(args: DeployArguments, hre: HardhatRuntimeE
     if (await txRegistry.hasRole(RELAYER_ROLE, address)) {
       console.log(`- ${contract.name} ${address}: already a relayer`);
     } else if (deployerIsAdmin) {
-      const tx = await txRegistry.grantRole(RELAYER_ROLE, address);
-      await tx.wait();
+      const tx = await sendTx(() => txRegistry.grantRole(RELAYER_ROLE, address));
       console.log(`- ${contract.name} ${address}: granted RELAYER_ROLE, tx ${tx.hash}`);
     } else {
       pendingRelayers.push(address);
