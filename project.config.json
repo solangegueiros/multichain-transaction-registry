@@ -1,8 +1,8 @@
 {
   "rpcUrl": "https://ethereum-sepolia-rpc.publicnode.com",
-  "multiChainTxRegistryAddress": "",
-  "fundRegistryAddress": "",
-  "orderRegistryAddress": "",
+  "multiChainTxRegistryAddress": "0x7926C35Db1D3D86EB76d33E3b8e0285BE909A996",
+  "fundRegistryAddress": "0x3Eb5BaEA21B48106461555817C122a0df16523a0",
+  "orderRegistryAddress": "0xdF8EBfaae5c3f1a9c87CC62841B54cFfEFd500a4",
   "creForwarderAddress": "",
   "multiChainTxReceiverAddress": ""
 }

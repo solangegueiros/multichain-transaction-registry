@@ -43,7 +43,7 @@ export default defineConfig({
       type: "http",
       chainType: "l1",
       url: projectConfig.rpcUrl,
-      accounts: [configVariable("SEPOLIA_PRIVATE_KEY")],
+      accounts: [configVariable("ETH_PRIVATE_KEY")],
     },
   },
   verify: {

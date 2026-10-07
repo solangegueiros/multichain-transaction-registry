@@ -12,6 +12,9 @@
     "contracts:deploy": "cd smart-contracts && npm run deploy --",
     "contracts:deploy-cre-receiver": "cd smart-contracts && npm run deploy-cre-receiver --",
     "contracts:register-chains": "cd smart-contracts && npm run register-chains --",
-    "contracts:register-stablecoins": "cd smart-contracts && npm run register-stablecoins --"
+    "contracts:register-stablecoins": "cd smart-contracts && npm run register-stablecoins --",
+    "workflow:install": "cd workflow-registry && bun install",
+    "workflow:sync-config": "node workflow-registry/scripts/sync-config.js",
+    "workflow:simulate": "cre workflow simulate workflow-registry --target local-simulation --non-interactive --trigger-index 0"
   }
 }

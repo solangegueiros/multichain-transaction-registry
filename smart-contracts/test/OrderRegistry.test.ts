@@ -1065,6 +1065,54 @@ describe("OrderRegistry", function () {
       expect(txData.amount).to.equal(DESTINATION_TX.amount);
     });
 
+    it("getOrderSyncStates returns the state of many orders, in the order asked", async function () {
+      const { registry, operator } = await loadFixture(txsFixture);
+      await registry
+        .connect(operator)
+        .registerOrder("order-2", FUND.fundId, "0x" + "22".repeat(32), { ...INTENT, orderId: "order-2" }, ORDER.createdAt + 10n);
+      await registry
+        .connect(operator)
+        .updateOrderProgress(ORDER.orderId, OrderProgress.ACQUIRED_WITH_LOCK, 3, ORDER.createdAt + 500n);
+
+      const states = await registry.getOrderSyncStates(["order-2", ORDER.orderId]);
+      expect(states.length).to.equal(2);
+
+      // registered, no transactions, still as registerOrder left it
+      expect(states[0].registered).to.equal(true);
+      expect(states[0].progress).to.equal(OrderProgress.AWAITING_ORIGIN);
+      expect(states[0].version).to.equal(0n);
+      expect(states[0].createdAt).to.equal(ORDER.createdAt + 10n);
+      expect(states[0].updatedAt).to.equal(ORDER.createdAt + 10n);
+      expect(states[0].roles).to.deep.equal([]);
+
+      // the transfer and the delivery of txsFixture, plus the progress update
+      expect(states[1].registered).to.equal(true);
+      expect(states[1].progress).to.equal(OrderProgress.ACQUIRED_WITH_LOCK);
+      expect(states[1].version).to.equal(3n);
+      expect(states[1].createdAt).to.equal(ORDER.createdAt);
+      expect(states[1].updatedAt).to.equal(ORDER.createdAt + 500n);
+      expect(states[1].roles).to.deep.equal([Role.TRANSFER, Role.DELIVERY]);
+    });
+
+    it("getOrderSyncStates marks an unknown order instead of reverting", async function () {
+      const { registry } = await loadFixture(orderFixture);
+
+      const states = await registry.getOrderSyncStates(["nope", ORDER.orderId.toUpperCase()]);
+      expect(states[0].registered).to.equal(false);
+      expect(states[0].version).to.equal(0n);
+      expect(states[0].createdAt).to.equal(0n);
+      expect(states[0].roles).to.deep.equal([]);
+      // the id is normalized as in every other function
+      expect(states[1].registered).to.equal(true);
+    });
+
+    it("getOrderSyncStates accepts an empty list and rejects an empty id", async function () {
+      const { registry } = await loadFixture(orderFixture);
+
+      expect(await registry.getOrderSyncStates([])).to.deep.equal([]);
+      await expect(registry.getOrderSyncStates([ORDER.orderId, " "])).to.be.revertedWith("Empty id");
+    });
+
     it("getOrderTx rejects an index outside the list", async function () {
       const { registry } = await loadFixture(txsFixture);
 

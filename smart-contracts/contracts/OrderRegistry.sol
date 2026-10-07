@@ -108,6 +108,17 @@ contract OrderRegistry is RegistryBase {
         uint256     txId;          // id in MultiChainTxRegistry
     }
 
+    /// @dev What a caller needs to know to decide which writes an order still needs.
+    ///      Returned by getOrderSyncStates, many orders in one call.
+    struct OrderSyncState {
+        bool          registered;   // false: every other field is empty
+        OrderProgress progress;
+        uint32        version;
+        uint256       createdAt;
+        uint256       updatedAt;
+        bytes32[]     roles;        // role of each transaction of the order, in the order they were recorded
+    }
+
     struct OrderTxInput {
         string      connectorId;
         string      standard;
@@ -459,6 +470,35 @@ contract OrderRegistry is RegistryBase {
         orderIds = new string[](keys.length);
         for (uint256 i = 0; i < keys.length; i++) {
             orderIds[i] = _orders[keys[i]].orderId;
+        }
+    }
+
+    /// @notice Sync state of many orders in one call, in the same order as orderIds.
+    ///         An orderId that is not registered does not revert: its entry comes back
+    ///         with registered == false.
+    /// @dev Made for callers with a small budget of calls, as a Chainlink CRE workflow:
+    ///      it replaces one getOrder and one getOrderTxs per order.
+    function getOrderSyncStates(string[] calldata orderIds) external view returns (OrderSyncState[] memory states) {
+        states = new OrderSyncState[](orderIds.length);
+        for (uint256 i = 0; i < orderIds.length; i++) {
+            bytes32 orderKey = keyOf(orderIds[i]);
+            Order storage o = _orders[orderKey];
+            if (o.orderKey == bytes32(0)) continue;
+
+            OrderTx[] storage list = _orderTxs[orderKey];
+            bytes32[] memory roles = new bytes32[](list.length);
+            for (uint256 j = 0; j < list.length; j++) {
+                roles[j] = list[j].role;
+            }
+
+            states[i] = OrderSyncState({
+                registered: true,
+                progress:   o.progress,
+                version:    o.version,
+                createdAt:  o.createdAt,
+                updatedAt:  o.updatedAt,
+                roles:      roles
+            });
         }
     }
 

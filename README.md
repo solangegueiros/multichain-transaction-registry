@@ -2,14 +2,29 @@
 
 Registro on-chain de transações de fundos e ordens observadas em várias redes blockchain.
 
+## Índice
+
+Neste arquivo:
+
+- [Por onde começar](#por-onde-começar)
+- [Comandos da raiz](#comandos-da-raiz)
+
+Outros documentos:
+
+- [Smart contracts - README](smart-contracts/README.md): contratos, deploy, registro de redes e stablecoins, permissões e a entrada do Chainlink CRE
+- [CRE workflow - README](workflow-registry/README.md): workflow do Chainlink CRE que lê a Observer API e grava nos contratos
+- [Exemplos de dados](smart-contracts/MultiChainTxRegistry.md): exemplos de preenchimento das structs dos contratos, como `ChainInfo`, `TxInput` e `ExtraArg`
+
 O repositório é dividido por partes, uma pasta para cada:
 
 | Pasta | Conteúdo |
 |---|---|
 | [smart-contracts/](smart-contracts/) | Contratos Solidity, testes e scripts de deploy, em um projeto Hardhat. Veja o [README dos smart contracts](smart-contracts/README.md) |
+| [workflow-registry/](workflow-registry/) | Workflow do Chainlink CRE: lê fundos e ordens na Observer API e grava nos contratos. Veja o [README do workflow](workflow-registry/README.md) |
+| [project.yaml](project.yaml) e [secrets.yaml](secrets.yaml) | Configuração do CRE CLI: o RPC de cada target e o nome dos segredos do workflow. Nenhum dos dois guarda valores secretos |
 | [project.config.json](project.config.json) | Configuração pública compartilhada: URL do RPC da Sepolia, endereço do forwarder do Chainlink CRE e endereços dos contratos publicados. A tarefa de deploy preenche os endereços dos contratos |
 | `project.backup.config.json` | Histórico dos endereços de contratos substituídos em um novo deploy. Só existe depois da primeira substituição |
-| `.env` | Segredos compartilhados: chave privada de deploy e chave do Etherscan. Crie a partir do [.env.example](.env.example). Não é commitado |
+| `.env` | Segredos compartilhados: chave privada de deploy, chave do Etherscan, chave da Observer API e chave da conta do CRE. Crie a partir do [.env.example](.env.example). Não é commitado |
 | [package.json](package.json) | Atalhos para rodar da raiz os comandos de cada parte |
 | [query-json/](query-json/) | Respostas de API de exemplo, com fundos e ordens reais. São a referência de dados para todas as partes |
 
@@ -22,6 +37,8 @@ npm test
 ```
 
 O `npm install` da raiz instala as dependências de `smart-contracts/`. Os testes rodam sem o `.env` preenchido; ele só é necessário para publicar na Sepolia.
+
+O workflow do Chainlink CRE tem instalação própria, com o Bun. Os passos estão no [README do workflow](workflow-registry/README.md).
 
 ## Comandos da raiz
 
@@ -38,6 +55,9 @@ O [package.json](package.json) da raiz não tem dependências próprias. Ele só
 | `npm run contracts:register-chains` | Registra as redes e as chaves de schema |
 | `npm run contracts:register-stablecoins` | Registra os stablecoins no `FundRegistry` |
 | `npm run contracts:install` | Instala só as dependências dos contratos |
+| `npm run workflow:install` | Instala as dependências do workflow, com o Bun |
+| `npm run workflow:simulate` | Simula o workflow no target `local-simulation`: lê a Observer API e mostra os relatórios que enviaria, sem gravar |
+| `npm run workflow:sync-config` | Copia os endereços dos contratos do `project.config.json` para as configurações do workflow |
 
 Estes atalhos são para os comandos sem opções: instalar, compilar, testar e experimentar na rede simulada do Hardhat. Sem opções, `contracts:deploy`, `contracts:register-chains` e `contracts:register-stablecoins` rodam na rede simulada e não publicam nada de verdade.
 

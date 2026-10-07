@@ -1,0 +1,36 @@
+# ==========================================================================
+# CRE WORKFLOW SETTINGS FILE
+# ==========================================================================
+# One block per target. Run from the repository root:
+#   cre workflow simulate workflow-registry --target <target>
+
+# Reads the Observer API and shows the reports it would send. Never writes:
+# do not use this target with --broadcast, deploy or any other lifecycle command.
+local-simulation:
+  user-workflow:
+    workflow-name: "workflow-registry-local-simulation"
+    deployment-registry: "private"
+  workflow-artifacts:
+    workflow-path: "./main.ts"
+    config-path: "./config/config.local-simulation.json"
+    secrets-path: "../secrets.yaml"
+
+# ==========================================================================
+staging-settings:
+  user-workflow:
+    workflow-name: "workflow-registry-staging"
+    deployment-registry: "private"
+  workflow-artifacts:
+    workflow-path: "./main.ts"
+    config-path: "./config/config.staging.json"
+    secrets-path: "../secrets.yaml"
+
+# ==========================================================================
+production-settings:
+  user-workflow:
+    workflow-name: "workflow-registry-production"
+    deployment-registry: "private"
+  workflow-artifacts:
+    workflow-path: "./main.ts"
+    config-path: "./config/config.production.json"
+    secrets-path: "../secrets.yaml"

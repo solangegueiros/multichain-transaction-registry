@@ -4,3 +4,7 @@ cache/
 types/
 dist/
 .env
+
+# Chainlink CRE workflow build output
+*.wasm
+.cre_build_tmp*

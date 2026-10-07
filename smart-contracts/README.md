@@ -14,9 +14,13 @@ Smart contracts do projeto, um projeto Hardhat.
 - [Fundos e ordens](#fundos-e-ordens)
 - [Estrutura do projeto](#estrutura-do-projeto)
 - [Status](#status)
-- [Observação](#observação)
+- [Observações](#observações)
 
 ## Introdução
+
+Registro on-chain de transações observadas redes blockchain. 
+
+Relayers confiáveis gravam cada transação (hash, partes, valor, ativo, bloco) em um formato comum, junto com campos específicos de cada rede, validados contra um schema por rede.
 
 Todos os comandos deste documento são executados dentro de `smart-contracts/`, com `npx hardhat`:
 
@@ -24,11 +28,7 @@ Todos os comandos deste documento são executados dentro de `smart-contracts/`, 
 cd smart-contracts
 ```
 
-Este é o jeito recomendado de rodar os comandos que recebem opções, como o deploy. A raiz do repositório tem atalhos com `npm run`, mas no PowerShell eles perdem as opções sem avisar se o `--` não for digitado entre aspas. Os detalhes estão em [Como digitar os comandos, com exemplos](#como-digitar-os-comandos-com-exemplos).
-
-Registro on-chain de transações observadas redes blockchain. 
-
-Relayers confiáveis gravam cada transação (hash, partes, valor, ativo, bloco) em um formato comum, junto com campos específicos de cada rede, validados contra um schema por rede.
+Este é o jeito recomendado de rodar os comandos que recebem opções, como o deploy. Caso esteja utilizando PowerShell, veja a observação [Comandos no Powershell](#comandos-no-powershell).
 
 O contrato está publicado na rede blockchain **Ethereum Sepolia**. 
 
@@ -60,7 +60,7 @@ Preencha o `.env`:
 
 | Variável | Para que serve |
 |---|---|
-| `SEPOLIA_PRIVATE_KEY` | Conta que publica os contratos e se torna admin deles |
+| `ETH_PRIVATE_KEY` | Conta que publica os contratos e se torna admin deles |
 | `ETHERSCAN_API_KEY` | Verifica o contrato no Etherscan |
 
 > `.env` guarda apenas segredos e está no `.gitignore`. 
@@ -135,45 +135,7 @@ npx hardhat deploy --network sepolia --only order-registry
 
 Confira na saída a linha `Network:`, que deve mostrar a rede que você pediu, antes de o deploy começar a publicar.
 
-**Alternativa: da raiz do repositório, com `npm run`.** Evite este jeito no PowerShell quando houver opções. Ele existe por conveniência, mas tem uma armadilha: há um `--` entre o nome do atalho e as opções, que avisa ao `npm` que o que vem depois é para o deploy, e não para o próprio `npm`.
-
-No **bash** (Git Bash, Linux, macOS), o `--` vai sem aspas:
-
-```sh
-npm run contracts:deploy -- --network sepolia
-npm run contracts:deploy -- --network sepolia --only order-registry --yes
-npm run contracts:deploy -- --network sepolia --force --yes
-```
-
-No **PowerShell**, o `--` precisa ir entre aspas simples, assim: `'--'`.
-
-```powershell
-npm run contracts:deploy '--' --network sepolia
-npm run contracts:deploy '--' --network sepolia --only order-registry --yes
-npm run contracts:deploy '--' --network sepolia --force --yes
-```
-
-**O que acontece no PowerShell sem as aspas.** O PowerShell descarta o `--`, o `npm` fica com as opções para si e o deploy roda sem nenhuma delas. O comando não dá erro: ele roda na rede simulada, como se você não tivesse passado nada. Dá para reconhecer pela saída:
-
-```text
-PS> npm run contracts:deploy -- --only order-registry --yes
-npm warn invalid config only="order-registry" set in command line options
-
-> hardhat deploy                              <- as opções sumiram
-Network: default | deployer: 0xf39F...        <- rede simulada, não a sepolia
-```
-
-Com as aspas, a mesma linha mostra as opções chegando ao deploy:
-
-```text
-PS> npm run contracts:deploy '--' --only order-registry --yes
-
-> hardhat deploy --only order-registry --yes  <- as opções chegaram
-```
-
-Antes de confiar em um deploy feito com `npm run`, confira essas duas linhas: a que começa com `> hardhat deploy` deve trazer as suas opções, e a linha `Network:` deve mostrar a rede que você pediu. Por causa dessa falha silenciosa, prefira o jeito recomendado, que não tem o `--`.
-
-O mesmo vale para qualquer atalho da raiz que receba opções, como `npm run contracts:register-chains '--' --network sepolia`.
+**Alternativa: da raiz do repositório, com `npm run`.** Os atalhos da raiz também aceitam as opções, depois de um `--`. No PowerShell esse jeito tem uma armadilha, explicada na observação [Comandos no Powershell](#comandos-no-powershell).
 
 **Sem opção, contratos já publicados são reaproveitados.** Cada endereço novo é gravado no `project.config.json` assim que o contrato é publicado. Por isso a tarefa pode ser executada de novo sem risco, e uma execução que parar no meio continua de onde parou.
 
@@ -203,8 +165,9 @@ Um contrato substituído continua com o `RELAYER_ROLE` enquanto o `MultiChainTxR
 
 ### 3. Registrar as redes
 
+Em `.\smart-contracts`:
+
 ```powershell
-cd smart-contracts
 npx hardhat run scripts/register-chains.ts --network sepolia
 ```
 
@@ -228,10 +191,11 @@ Só entram no schema os dados que não têm campo fixo na transação. Tipo da t
 
 A Rayls é registrada com o genesis hash zerado, porque ele não vem nos dados de origem.
 
-### 4. Registrar os stablecoins
+### 4. Registrar stablecoins
+
+Em `.\smart-contracts`:
 
 ```powershell
-cd smart-contracts
 npx hardhat run scripts/register-stablecoins.ts --network sepolia
 ```
 
@@ -338,6 +302,7 @@ Há uma suíte por contrato:
 - [test/OrderRegistry.test.ts](test/OrderRegistry.test.ts) cobre o deploy ligado ao `FundRegistry`, os papéis de transação, registro de ordens, validação do intent contra o fundo, a lista de transações de cada ordem, atualizações de evidência, status e progresso, e um cenário com dois fundos e ordens em XRPL e Stellar.
 - [test/MultiChainTxReceiver.test.ts](test/MultiChainTxReceiver.test.ts) cobre a entrada pelo Chainlink CRE: quem pode entregar relatórios, registro e atualização de status por relatório, proteção contra repetição, checagens de identidade do workflow e configuração. Nos testes, uma conta comum faz o papel do forwarder.
 - [test/MultiChainTxReceiver.links.test.ts](test/MultiChainTxReceiver.links.test.ts) cobre os relatórios que gravam no `OrderRegistry` e no `FundRegistry`: registro de fundo e de ordem, progresso da ordem, transações ligadas a ordens e a fundos, os papéis exigidos em cada contrato, a configuração dos dois registries no receptor e um cenário em que um fundo e uma ordem são mantidos só por relatórios.
+- [test/Workflow.e2e.test.ts](test/Workflow.e2e.test.ts) cobre o workflow do Chainlink CRE de ponta a ponta: monta os relatórios com o código de [../workflow-registry/lib/](../workflow-registry/lib/) a partir das respostas de [query-json/](../query-json/) e os entrega aos contratos. É pulado quando as dependências do workflow não estão instaladas.
 - [test/helpers/fundOrder.ts](test/helpers/fundOrder.ts) guarda os dados de exemplo e as fixtures usados pelas duas suítes acima, montados a partir de [query-json/](../query-json/).
 
 O deploy e os scripts de registro rodam sem `--network` na rede simulada do próprio Hardhat, sem precisar do `.env`:
@@ -493,7 +458,7 @@ Em `RECORD_ORDER_TX`, o `role` é o papel da transação em `bytes32`, como `TRA
 
 Por esses dois caminhos, o `registeredBy` da transação no registry é o `OrderRegistry` ou o `FundRegistry`, e não o receptor. O receptor aparece como operador no evento `OrderTxLinked`. Os eventos `OrderTxRecordedByWorkflow` e `FundCreationTxRecordedByWorkflow`, do próprio receptor, registram qual workflow enviou o relatório.
 
-Esboço da montagem do relatório em um workflow TypeScript, com `viem`. Ele segue o formato acima, mas ainda não foi executado em um workflow: este repositório ainda não tem a parte de workflow.
+O workflow deste repositório fica em [../workflow-registry/](../workflow-registry/README.md). Ele lê a Observer API e envia os relatórios de fundos e ordens neste formato, com a codificação em [lib/encode.ts](../workflow-registry/lib/encode.ts). O trecho abaixo mostra a montagem de um relatório `REGISTER_TX` em TypeScript, com `viem`:
 
 ```typescript
 import { encodeAbiParameters, parseAbiParameters } from "viem";
@@ -585,7 +550,7 @@ Ao gravar ou atualizar uma transação, o contrato confere os dois:
 
 Desativar não apaga nada: as transações que já têm o papel ou o disposition continuam com ele. Um valor cadastrado não pode ser alterado nem removido, só desativado.
 
-O contrato não confere coerência entre os dois rótulos. Nada impede gravar uma transação com papel `DELIVERY` e disposition `LOCKED`. A explicação completa está em [Observação](#observação).
+O contrato não confere coerência entre os dois rótulos. Nada impede gravar uma transação com papel `DELIVERY` e disposition `LOCKED`. A explicação completa está em [Observações](#observações).
 
 ### Order, OrderIntent e OrderTx
 
@@ -632,6 +597,21 @@ O que o contrato não amarra:
 
 Em resumo: o intent é o pedido fixo, a ordem é o estado declarado e as transações são os fatos. O contrato guarda os três lado a lado e garante que pertencem à mesma ordem, mas a coerência entre eles depende de quem faz a carga.
 
+### Consultar várias ordens de uma vez
+
+`getOrderSyncStates(orderIds)` devolve, em uma só chamada, o resumo de várias ordens, na mesma sequência dos ids recebidos:
+
+| Campo | Significado |
+|---|---|
+| `registered` | Se a ordem está registrada. Quando é `false`, os outros campos vêm vazios |
+| `progress`, `version` | Progresso e versão gravados |
+| `createdAt`, `updatedAt` | Datas gravadas |
+| `roles` | Papel de cada transação já gravada, na sequência em que foram gravadas |
+
+Um id desconhecido não reverte: a entrada dele vem com `registered` falso. Só um id vazio reverte, com `Empty id`.
+
+A função existe para quem tem poucas chamadas disponíveis, como o [workflow do Chainlink CRE](../workflow-registry/README.md#limites-de-uma-execução), que pode fazer 15 leituras por execução. Com ela, o workflow descobre o que falta gravar em todas as ordens de um fundo com uma leitura, em vez de duas por ordem.
+
 ## Estrutura do projeto
 
 | Caminho | Conteúdo |
@@ -650,7 +630,7 @@ Em resumo: o intent é o pedido fixo, a ordem é o estado declarado e as transa�
 | [scripts/deploy-cre-receiver.ts](scripts/deploy-cre-receiver.ts) | Publica o `MultiChainTxReceiver` e mantém o forwarder dele igual ao do `project.config.json` |
 | [scripts/register-chains.ts](scripts/register-chains.ts) | Registro das redes rastreadas e das chaves de schema de cada rede |
 | [scripts/register-stablecoins.ts](scripts/register-stablecoins.ts) | Registro dos stablecoins no `FundRegistry` |
-| [scripts/lib/chains.ts](scripts/lib/chains.ts) | Lista das redes rastreadas, usada pelos scripts |
+| [scripts/lib/chains.ts](scripts/lib/chains.ts) | Lista das redes rastreadas e das chaves de schema de cada rede, usada pelos scripts e pelos testes |
 | [scripts/lib/check-env.ts](scripts/lib/check-env.ts) | Checagem da chave privada, usada pelos scripts |
 | [project-config.ts](project-config.ts) | Lê o `project.config.json` da raiz e expõe a configuração tipada para o Hardhat e os scripts |
 | [../project.config.json](../project.config.json) | Configuração pública, na raiz do repositório |
@@ -659,12 +639,57 @@ Em resumo: o intent é o pedido fixo, a ordem é o estado declarado e as transa�
 | [hardhat.config.ts](hardhat.config.ts) | Compilador, rede e verificação |
 | [MultiChainTxRegistry.md](MultiChainTxRegistry.md) | Exemplos de dados |
 | [../query-json/](../query-json/) | Respostas de API de exemplo, de onde os exemplos foram tirados. Fica na raiz do repositório, fora desta pasta |
+| [../workflow-registry/](../workflow-registry/README.md) | Workflow do Chainlink CRE que envia os relatórios ao `MultiChainTxReceiver`. Fica na raiz do repositório, fora desta pasta |
 
 ## Status
 
 Os dois contratos têm testes automatizados (`npm test`). Ainda não foi publicado na Sepolia: `multiChainTxRegistryAddress` está vazio.
 
-## Observação
+## Observações
+
+### Comandos no Powershell
+
+A raiz do repositório tem atalhos com `npm run`, mas no PowerShell eles perdem as opções sem avisar se o `--` não for digitado entre aspas. O jeito recomendado, sem essa armadilha, está em [Como digitar os comandos, com exemplos](#como-digitar-os-comandos-com-exemplos).
+
+**Alternativa: da raiz do repositório, com `npm run`.** Evite este jeito no PowerShell quando houver opções. Ele existe por conveniência, mas tem uma armadilha: há um `--` entre o nome do atalho e as opções, que avisa ao `npm` que o que vem depois é para o deploy, e não para o próprio `npm`.
+
+No **bash** (Git Bash, Linux, macOS), o `--` vai sem aspas:
+
+```sh
+npm run contracts:deploy -- --network sepolia
+npm run contracts:deploy -- --network sepolia --only order-registry --yes
+npm run contracts:deploy -- --network sepolia --force --yes
+```
+
+No **PowerShell**, o `--` precisa ir entre aspas simples, assim: `'--'`.
+
+```powershell
+npm run contracts:deploy '--' --network sepolia
+npm run contracts:deploy '--' --network sepolia --only order-registry --yes
+npm run contracts:deploy '--' --network sepolia --force --yes
+```
+
+**O que acontece no PowerShell sem as aspas.** O PowerShell descarta o `--`, o `npm` fica com as opções para si e o deploy roda sem nenhuma delas. O comando não dá erro: ele roda na rede simulada, como se você não tivesse passado nada. Dá para reconhecer pela saída:
+
+```text
+PS> npm run contracts:deploy -- --only order-registry --yes
+npm warn invalid config only="order-registry" set in command line options
+
+> hardhat deploy                              <- as opções sumiram
+Network: default | deployer: 0xf39F...        <- rede simulada, não a sepolia
+```
+
+Com as aspas, a mesma linha mostra as opções chegando ao deploy:
+
+```text
+PS> npm run contracts:deploy '--' --only order-registry --yes
+
+> hardhat deploy --only order-registry --yes  <- as opções chegaram
+```
+
+Antes de confiar em um deploy feito com `npm run`, confira essas duas linhas: a que começa com `> hardhat deploy` deve trazer as suas opções, e a linha `Network:` deve mostrar a rede que você pediu. Por causa dessa falha silenciosa, prefira o jeito recomendado, que não tem o `--`.
+
+O mesmo vale para qualquer atalho da raiz que receba opções, como `npm run contracts:register-chains '--' --network sepolia`.
 
 ### Papel e disposition não são conferidos um contra o outro
 

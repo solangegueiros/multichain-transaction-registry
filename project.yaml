@@ -1,0 +1,26 @@
+# ==========================================================================
+# CRE PROJECT SETTINGS FILE
+# ==========================================================================
+# Settings of the Chainlink CRE CLI, one block per target. The workflow lives in
+# workflow-registry/; its own settings are in workflow-registry/workflow.yaml.
+#
+# RPC URLs support ${VAR_NAME} to reference variables of the .env file.
+
+# Reads the Observer API only. The CLI requires an RPC in every target, but this
+# target never calls it.
+local-simulation:
+  rpcs:
+    - chain-name: ethereum-testnet-sepolia
+      url: https://ethereum-sepolia-rpc.publicnode.com
+
+# ==========================================================================
+staging-settings:
+  rpcs:
+    - chain-name: ethereum-testnet-sepolia
+      url: https://ethereum-sepolia-rpc.publicnode.com
+
+# ==========================================================================
+production-settings:
+  rpcs:
+    - chain-name: ethereum-testnet-sepolia
+      url: https://ethereum-sepolia-rpc.publicnode.com

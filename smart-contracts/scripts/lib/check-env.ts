@@ -6,14 +6,14 @@ export function assertPrivateKey(networkConfig: NetworkConfig): void {
   // The local simulated network uses its own test accounts
   if (networkConfig.type === "edr-simulated") return;
 
-  const key = (process.env.SEPOLIA_PRIVATE_KEY ?? "").trim();
+  const key = (process.env.ETH_PRIVATE_KEY ?? "").trim();
 
   if (key === "") {
-    fail("SEPOLIA_PRIVATE_KEY is empty. Set it in the .env at the repository root (see .env.example).");
+    fail("ETH_PRIVATE_KEY is empty. Set it in the .env at the repository root (see .env.example).");
   }
 
   if (!/^(0x)?[0-9a-fA-F]{64}$/.test(key)) {
-    fail("SEPOLIA_PRIVATE_KEY is invalid: expected 64 hexadecimal characters (with or without 0x).");
+    fail("ETH_PRIVATE_KEY is invalid: expected 64 hexadecimal characters (with or without 0x).");
   }
 }
 
