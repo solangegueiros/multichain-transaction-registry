@@ -47,11 +47,28 @@ Quando o comando recebe opções, como `--network sepolia`, rode de dentro de `s
 
 ```powershell
 cd smart-contracts
+```
 
+```powershell
 npx hardhat deploy --network sepolia
+```
+
+ou para apenas uma parte, exemplo order-registry:
+
+```powershell
 npx hardhat deploy --network sepolia --only order-registry --yes
+```
+
+Também execute:
+
+```powershell
 npx hardhat run scripts/register-chains.ts --network sepolia
 npx hardhat run scripts/register-stablecoins.ts --network sepolia
+```
+
+Para registrar com Chailink CRE:
+
+```powershell
 npx hardhat run scripts/deploy-cre-receiver.ts --network sepolia
 ```
 
@@ -59,7 +76,7 @@ A ordem importa: primeiro o deploy, depois as redes, depois os stablecoins. O re
 
 Funciona igual no PowerShell, no Prompt de Comando e no bash. As opções do deploy e mais exemplos estão no [README dos smart contracts](smart-contracts/README.md#como-digitar-os-comandos-com-exemplos).
 
-### Por que não usar os atalhos com opções
+#### Observação no PowerShell - por que não usar os atalhos com opções
 
 Os atalhos aceitam opções depois de um `--`, mas no PowerShell isso tem uma armadilha. O `--` precisa ir entre aspas simples:
 
