@@ -12,10 +12,10 @@
   "maxOrdersPerRun": 5,
   "chainSelectorName": "ethereum-testnet-sepolia",
   "targetChainId": "11155111",
-  "receiverAddress": "",
-  "txRegistryAddress": "",
-  "fundRegistryAddress": "",
-  "orderRegistryAddress": "",
+  "receiverAddress": "0xf0C8E6E9459E45B63Ee8C32f3c1f149A70FaFa4B",
+  "txRegistryAddress": "0x7926C35Db1D3D86EB76d33E3b8e0285BE909A996",
+  "fundRegistryAddress": "0x3Eb5BaEA21B48106461555817C122a0df16523a0",
+  "orderRegistryAddress": "0xdF8EBfaae5c3f1a9c87CC62841B54cFfEFd500a4",
   "gasLimit": "2500000",
   "maxWritesPerRun": 5
 }

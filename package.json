@@ -13,8 +13,14 @@
     "contracts:deploy-cre-receiver": "cd smart-contracts && npm run deploy-cre-receiver --",
     "contracts:register-chains": "cd smart-contracts && npm run register-chains --",
     "contracts:register-stablecoins": "cd smart-contracts && npm run register-stablecoins --",
-    "workflow:install": "cd workflow-registry && bun install",
+    "contracts:deploy-and-setup-all": "cd smart-contracts && npm run deploy-and-setup-all --",
+    "workflow:install": "bun install --cwd ./workflow-registry",
     "workflow:sync-config": "node workflow-registry/scripts/sync-config.js",
-    "workflow:simulate": "cre workflow simulate workflow-registry --target local-simulation --non-interactive --trigger-index 0"
+    "workflow:simulate": "cre workflow simulate workflow-registry --target local-simulation --non-interactive --trigger-index 0",
+    "frontend:install": "npm install --prefix ./frontend",
+    "frontend:dev": "npm run dev --prefix ./frontend",
+    "frontend:build": "npm run build --prefix ./frontend",
+    "frontend:preview": "npm run preview --prefix ./frontend",
+    "frontend:sync-abi": "npm run sync-abi --prefix ./frontend"
   }
 }

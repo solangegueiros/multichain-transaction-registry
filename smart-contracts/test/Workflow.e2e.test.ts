@@ -8,8 +8,8 @@ import { CHAINS, SCHEMA_KEYS_BY_NETWORK } from "../scripts/lib/chains.js";
 // It proves that the ABI encoding of the workflow matches what MultiChainTxReceiver decodes,
 // and that the extra args it sends are the ones scripts/register-chains.ts registers.
 //
-// The workflow has its own dependencies. Without them (cd workflow-registry; bun install)
-// these tests are skipped.
+// The workflow has its own dependencies. Without them these tests are skipped. To install,
+// from the repository root: bun install --cwd ./workflow-registry
 
 const { time } = networkHelpers;
 

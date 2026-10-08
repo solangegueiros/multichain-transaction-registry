@@ -50,11 +50,10 @@ O formato dos relatórios e as proteções do receptor estão no [README dos sma
 | `API_OBSERVER_KEY` | Chave da Observer API, enviada no cabeçalho `X-Observer-Key` |
 | `CRE_ETH_PRIVATE_KEY` | Conta que o CLI usa para enviar transações na simulação com `--broadcast` e para publicar o workflow |
 
-Instale as dependências:
+Instale as dependências, da raiz do repositório:
 
-```powershell
-cd workflow-registry
-bun install
+```bash
+bun install --cwd ./workflow-registry
 ```
 
 ## Arquivos
@@ -111,13 +110,15 @@ Campos só do modo `production`:
 
 A configuração é validada na partida. Um campo a mais, um campo faltando ou um endereço vazio impedem o workflow de rodar. O modo `local-simulation` não aceita endereços de contrato: sem eles o código não tem como gravar.
 
-Os quatro endereços vêm do [project.config.json](../project.config.json) da raiz, que os scripts de deploy preenchem. Depois de publicar os contratos, copie-os para as duas configurações de produção:
+Os quatro endereços vêm do [project.config.json](../project.config.json) da raiz, que os scripts de deploy preenchem. Depois de publicar os contratos, copie-os para as duas configurações de produção, com o comando abaixo.
+
+Execute na raiz do projeto:
 
 ```powershell
 npm run sync-config
 ```
 
-Hoje os endereços estão vazios nas duas, porque os contratos ainda não foram publicados na Sepolia.
+As duas já estão com os endereços dos contratos publicados na Sepolia. Rode o comando de novo sempre que um contrato for publicado outra vez.
 
 ## Simulação local
 
@@ -141,7 +142,7 @@ A simulação compila o workflow, dispara o cron uma vez e chama a Observer API 
 O CLI lê o `.env` da raiz do repositório. Para usar outro arquivo, passe o caminho com `-e`:
 
 ```powershell
-cre workflow simulate workflow-registry --target local-simulation --non-interactive --trigger-index 0 -e ..\pt-tig\.env
+cre workflow simulate workflow-registry --target local-simulation --non-interactive --trigger-index 0 -e ..\folder2\.env
 ```
 
 Este target é só para simulação. Não o use com `--broadcast`, `deploy` nem outro comando de ciclo de vida.
@@ -166,7 +167,16 @@ Sem os passos 2 e 3 o workflow não envia o relatório do fundo. Ele confere ant
 cre workflow simulate workflow-registry --target staging-settings --non-interactive --trigger-index 0
 ```
 
-Sem `--broadcast` a simulação lê a API e os contratos e monta os relatórios, mas não envia nada. Cada relatório aparece no log como erro `no transaction hash: the report was not sent`. É o esperado neste passo: serve para conferir quais relatórios seriam enviados.
+Sem `--broadcast` a simulação lê a API e os contratos e monta os relatórios, mas não envia nada. Cada relatório aparece no log com a marca `[no --broadcast]`, e a execução segue como se ele tivesse sido entregue, para mostrar os relatórios seguintes:
+
+```text
+[USER LOG] [no --broadcast] would send REGISTER_FUND fund af5b7014-d16f-4494-ab99-130fdda864b6 (not sent)
+[USER LOG] [no --broadcast] would send REGISTER_ORDER order 43cc4855-2a98-4c24-9b95-6e7da34374e7 (not sent)
+[USER LOG] deferred REGISTER_ORDER order 9295af55-d71d-4551-a566-778d77dfd75a: write limit of the run reached
+[USER LOG] done: 1 fund(s), 5 order(s), 26 report(s) due, 0 sent, 5 not sent (simulation without --broadcast), 21 deferred, 0 error(s); 3 API call(s), 4 chain read(s)
+```
+
+Isso não é erro. A linha final separa os relatórios enviados, os não enviados por falta de `--broadcast` e os adiados pelo limite de escritas. Como nada é gravado, a execução seguinte mostra os mesmos relatórios.
 
 ### 3. Simular enviando
 
@@ -256,7 +266,7 @@ cd smart-contracts
 npx hardhat test test/Workflow.e2e.test.ts
 ```
 
-O teste precisa das dependências do workflow instaladas. Sem elas, é pulado.
+O teste precisa das dependências do workflow instaladas, com `bun install --cwd ./workflow-registry`. Sem elas, é pulado.
 
 ## Status
 
@@ -265,7 +275,9 @@ O teste precisa das dependências do workflow instaladas. Sem elas, é pulado.
 | Simulação `local-simulation` com a Observer API de verdade | Executada, com os quatro fundos |
 | Relatórios entregues aos contratos na rede simulada do Hardhat | Executado, 6 testes passando, lendo o estado com `getOrderSyncStates` |
 | Modo `production` lendo contratos em um nó local, sem enviar | Executado: 3 leituras para conferir as 13 ordens de um fundo |
-| Simulação com `--broadcast` na Sepolia | Não executada: os contratos ainda não estão publicados |
+| Contratos publicados na Sepolia, com redes e stablecoins registrados | Feito. Os endereços estão no [project.config.json](../project.config.json) e nas configurações do workflow |
+| Simulação `staging-settings` lendo os contratos da Sepolia, sem enviar | Executada: os quatro fundos passaram nas conferências de rede e de stablecoin, e os quatro relatórios `REGISTER_FUND` ficaram prontos para envio |
+| Simulação com `--broadcast` na Sepolia | Não executada |
 | Workflow publicado | Não publicado |
 
-O envio de relatórios pelo forwarder ainda não foi exercitado de ponta a ponta. A primeira simulação com `--broadcast` é o teste que falta.
+O envio de relatórios pelo forwarder ainda não foi exercitado de ponta a ponta. A primeira simulação com `--broadcast` é o teste que falta. Até ela, não há fundos, ordens nem transações registrados nos contratos.

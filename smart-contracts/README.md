@@ -287,6 +287,34 @@ O que mais o script faz:
 
 O script pode ser executado quantas vezes for preciso: ele só envia as transações que ainda faltam.
 
+### 6. Publicar tudo de uma vez
+
+Se você já conhece o projeto e quer agilizar a publicação, o script [scripts/deploy-and-setup-all.ts](scripts/deploy-and-setup-all.ts) roda os cinco passos anteriores em sequência, com um comando só:
+
+```powershell
+npx hardhat run scripts/deploy-and-setup-all.ts --network sepolia
+```
+
+Rode de dentro de `smart-contracts/`, com o `.env` e o `project.config.json` da raiz preenchidos como descrito em [Configuração](#configuração).
+
+| Passo | O que o script executa |
+|---|---|
+| 1 | `npx hardhat build` |
+| 2 | `npx hardhat deploy --network sepolia` |
+| 3 | `npx hardhat run scripts/register-chains.ts --network sepolia` |
+| 4 | `npx hardhat run scripts/register-stablecoins.ts --network sepolia` |
+| 5 | `npx hardhat run scripts/deploy-cre-receiver.ts --network sepolia` |
+
+A saída de cada um aparece no terminal, depois de uma linha `=== Step N of 5 ===`.
+
+Sem `--network`, os passos rodam na rede simulada do Hardhat. Lá cada passo começa de uma rede vazia e nada é gravado no arquivo. Serve só para conferir que os cinco rodam.
+
+Depois do script, copie os endereços para o workflow do Chainlink CRE. Rode da raiz do repositório:
+
+```powershell
+npm run workflow:sync-config
+```
+
 ## Testes locais
 
 Os testes automatizados rodam na rede simulada do Hardhat, sem precisar do `.env`:
@@ -302,7 +330,7 @@ Há uma suíte por contrato:
 - [test/OrderRegistry.test.ts](test/OrderRegistry.test.ts) cobre o deploy ligado ao `FundRegistry`, os papéis de transação, registro de ordens, validação do intent contra o fundo, a lista de transações de cada ordem, atualizações de evidência, status e progresso, e um cenário com dois fundos e ordens em XRPL e Stellar.
 - [test/MultiChainTxReceiver.test.ts](test/MultiChainTxReceiver.test.ts) cobre a entrada pelo Chainlink CRE: quem pode entregar relatórios, registro e atualização de status por relatório, proteção contra repetição, checagens de identidade do workflow e configuração. Nos testes, uma conta comum faz o papel do forwarder.
 - [test/MultiChainTxReceiver.links.test.ts](test/MultiChainTxReceiver.links.test.ts) cobre os relatórios que gravam no `OrderRegistry` e no `FundRegistry`: registro de fundo e de ordem, progresso da ordem, transações ligadas a ordens e a fundos, os papéis exigidos em cada contrato, a configuração dos dois registries no receptor e um cenário em que um fundo e uma ordem são mantidos só por relatórios.
-- [test/Workflow.e2e.test.ts](test/Workflow.e2e.test.ts) cobre o workflow do Chainlink CRE de ponta a ponta: monta os relatórios com o código de [../workflow-registry/lib/](../workflow-registry/lib/) a partir das respostas de [query-json/](../query-json/) e os entrega aos contratos. É pulado quando as dependências do workflow não estão instaladas.
+- [test/Workflow.e2e.test.ts](test/Workflow.e2e.test.ts) cobre o workflow do Chainlink CRE de ponta a ponta: monta os relatórios com o código de [../workflow-registry/lib/](../workflow-registry/lib/) a partir das respostas de [query-json/](../query-json/) e os entrega aos contratos. É pulado quando as dependências do workflow não estão instaladas. Para instalar, rode `bun install --cwd ./workflow-registry` da raiz do repositório.
 - [test/helpers/fundOrder.ts](test/helpers/fundOrder.ts) guarda os dados de exemplo e as fixtures usados pelas duas suítes acima, montados a partir de [query-json/](../query-json/).
 
 O deploy e os scripts de registro rodam sem `--network` na rede simulada do próprio Hardhat, sem precisar do `.env`:
@@ -628,10 +656,12 @@ A função existe para quem tem poucas chamadas disponíveis, como o [workflow d
 | [test/](test/) | Testes automatizados, um arquivo por contrato |
 | [tasks/deploy.ts](tasks/deploy.ts) | Tarefa `deploy`: publicação, verificação e relayers dos três contratos |
 | [scripts/deploy-cre-receiver.ts](scripts/deploy-cre-receiver.ts) | Publica o `MultiChainTxReceiver` e mantém o forwarder dele igual ao do `project.config.json` |
+| [scripts/deploy-and-setup-all.ts](scripts/deploy-and-setup-all.ts) | Roda todos os passos de publicação em sequência: compilar, deploy, redes, stablecoins e receptor do CRE |
 | [scripts/register-chains.ts](scripts/register-chains.ts) | Registro das redes rastreadas e das chaves de schema de cada rede |
 | [scripts/register-stablecoins.ts](scripts/register-stablecoins.ts) | Registro dos stablecoins no `FundRegistry` |
 | [scripts/lib/chains.ts](scripts/lib/chains.ts) | Lista das redes rastreadas e das chaves de schema de cada rede, usada pelos scripts e pelos testes |
 | [scripts/lib/check-env.ts](scripts/lib/check-env.ts) | Checagem da chave privada, usada pelos scripts |
+| [scripts/lib/send-tx.ts](scripts/lib/send-tx.ts) | Envio de transação com nova tentativa quando o nó acusa uma transação pendente da conta |
 | [project-config.ts](project-config.ts) | Lê o `project.config.json` da raiz e expõe a configuração tipada para o Hardhat e os scripts |
 | [../project.config.json](../project.config.json) | Configuração pública, na raiz do repositório |
 | `../.env` | Segredos, na raiz do repositório. Não é commitado |
@@ -643,7 +673,11 @@ A função existe para quem tem poucas chamadas disponíveis, como o [workflow d
 
 ## Status
 
-Os dois contratos têm testes automatizados (`npm test`). Ainda não foi publicado na Sepolia: `multiChainTxRegistryAddress` está vazio.
+Os quatro contratos têm testes automatizados (`npm test`): `MultiChainTxRegistry`, `FundRegistry`, `OrderRegistry` e `MultiChainTxReceiver`.
+
+Os quatro estão publicados na Ethereum Sepolia, nos endereços do [project.config.json](../project.config.json). As redes, as chaves de schema e os stablecoins estão registrados. O receptor usa o forwarder de simulação do Chainlink CRE.
+
+Ainda não há fundos, ordens nem transações registrados: essa carga é feita pelo [workflow do Chainlink CRE](../workflow-registry/README.md), que ainda não foi executado com `--broadcast`.
 
 ## Observações
 
@@ -690,6 +724,36 @@ PS> npm run contracts:deploy '--' --only order-registry --yes
 Antes de confiar em um deploy feito com `npm run`, confira essas duas linhas: a que começa com `> hardhat deploy` deve trazer as suas opções, e a linha `Network:` deve mostrar a rede que você pediu. Por causa dessa falha silenciosa, prefira o jeito recomendado, que não tem o `--`.
 
 O mesmo vale para qualquer atalho da raiz que receba opções, como `npm run contracts:register-chains '--' --network sepolia`.
+
+### Erro com conta delegada: in-flight transaction limit
+
+Ao rodar o deploy ou um script de registro em uma rede real, o comando pode parar no meio com este erro:
+
+```text
+ProviderError: in-flight transaction limit reached for delegated accounts
+```
+
+O erro não vem dos contratos nem dos dados. Ele vem do nó da rede, e depende da conta usada em `ETH_PRIVATE_KEY`.
+
+**O que é uma conta delegada.** Uma conta comum, controlada só por chave privada, não tem código. A EIP-7702 permite que ela aponte para um contrato e passe a se comportar como ele. É o que as carteiras chamam de "smart account". A conta e o endereço continuam os mesmos.
+
+**Por que o erro acontece.** Os nós aceitam só uma transação pendente por vez de uma conta delegada. Os scripts enviam várias transações em sequência, esperando cada uma ser minerada. Mas um RPC público distribui as chamadas entre vários nós, e o nó que recebe a transação seguinte pode ainda não ter visto a anterior minerada. Para ele há uma pendente, e a nova é recusada.
+
+**O que os scripts fazem.** Quando esse erro aparece, a transação é enviada de novo depois de uma pausa de 6 segundos, até 10 vezes, com um aviso na saída. A lógica está em [scripts/lib/send-tx.ts](scripts/lib/send-tx.ts). Se mesmo assim o comando parar, rode-o de novo: o deploy e os scripts de registro pulam o que já foi feito e continuam de onde pararam.
+
+**Como saber se a conta está delegada.** Consulte o código da conta com `eth_getCode`. Uma conta comum responde `0x`. Uma conta delegada responde `0xef0100` seguido do endereço do contrato para o qual ela delega.
+
+**Como evitar o erro de vez.** Há duas saídas:
+
+| | Usar uma conta sem delegação | Remover a delegação da conta |
+|---|---|---|
+| O que fazer | Trocar a chave em `ETH_PRIVATE_KEY` pela de uma conta comum | Voltar a conta para conta comum, pela carteira |
+| Contratos já publicados | A conta nova não é admin deles. Um admin atual precisa conceder o papel de admin a ela, com `grantRole`, em cada contrato | Nada muda: o endereço e os papéis continuam os mesmos |
+| Pode voltar a acontecer | Não | Sim, se a delegação for ativada de novo na carteira |
+
+Remover a delegação é uma transação da própria conta que aponta a delegação para o endereço zero. Quem monta essa transação é a carteira, na opção de voltar para conta comum. A delegação vale por rede: removê-la na Sepolia não altera as outras redes.
+
+Usar uma conta só para deploy tem uma vantagem a mais: a chave que fica no `.env` não é a da carteira do dia a dia.
 
 ### Papel e disposition não são conferidos um contra o outro
 

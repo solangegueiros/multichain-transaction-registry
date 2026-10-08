@@ -9,7 +9,8 @@
     "deploy": "hardhat deploy",
     "deploy-cre-receiver": "hardhat run scripts/deploy-cre-receiver.ts",
     "register-chains": "hardhat run scripts/register-chains.ts",
-    "register-stablecoins": "hardhat run scripts/register-stablecoins.ts"
+    "register-stablecoins": "hardhat run scripts/register-stablecoins.ts",
+    "deploy-and-setup-all": "hardhat run scripts/deploy-and-setup-all.ts"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox-mocha-ethers": "^4.0.0",

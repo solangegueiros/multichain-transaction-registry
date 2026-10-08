@@ -120,12 +120,17 @@ type Summary = {
   ordersSeen: number;
   planned: number; // reports due, found in this run
   written: number; // reports delivered
+  notBroadcast: number; // reports built in a simulation without --broadcast: nothing was sent
   deferred: number; // reports left for the next runs
   sent: string[];
   errors: string[];
 };
 
-const message = (err: unknown): string => (err instanceof Error ? err.message : String(err));
+/// Text of an error. An error raised inside a capability callback comes back from the
+/// SDK with its error code in front, as "[2]Unknown: ": the code says nothing about the
+/// cause, so it is dropped.
+const message = (err: unknown): string =>
+  (err instanceof Error ? err.message : String(err)).replace(/^\[\d+\]\w+: /, "");
 
 /// Same list, starting at a position that changes from run to run, so that work
 /// that never succeeds cannot keep the rest of the list from being reached.
@@ -176,6 +181,12 @@ class ObserverApi {
             })
             .result();
           if (response.statusCode === 404) return JSON.stringify({ found: false });
+          if (response.statusCode === 401 || response.statusCode === 403) {
+            throw new Error(
+              `Observer API GET ${path}: HTTP ${response.statusCode}, the API refused the credentials ` +
+                "(check API_OBSERVER_KEY in .env and apiClientId in the config)",
+            );
+          }
           if (!ok(response)) throw new Error(`Observer API GET ${path}: HTTP ${response.statusCode}`);
           return JSON.stringify({ found: true, body: project(json(response) as Record<string, unknown>) });
         },
@@ -325,9 +336,10 @@ class Registries {
     return states;
   }
 
-  /// Sends one report to MultiChainTxReceiver. Returns the transaction hash; throws
-  /// when the transaction fails or when the receiver rejects the report.
-  write(action: PlannedAction, timestamp: bigint): string {
+  /// Sends one report to MultiChainTxReceiver. Returns the transaction hash, or null when
+  /// the report was built but not sent, which is what a simulation without --broadcast
+  /// does. Throws when the transaction fails or when the receiver rejects the report.
+  write(action: PlannedAction, timestamp: bigint): string | null {
     if (this.writesLeft <= 0) throw new Error("Write limit of the run reached");
     this.writes++;
 
@@ -345,10 +357,9 @@ class Registries {
     if (result.txStatus !== TxStatus.SUCCESS) {
       throw new Error(result.errorMessage ?? `write status ${result.txStatus}`);
     }
-    if (!result.txHash || result.txHash.length === 0) {
-      // what a simulation without --broadcast returns: the report was built but not sent
-      throw new Error("no transaction hash: the report was not sent (simulation without --broadcast?)");
-    }
+    // A simulation without --broadcast reports success with no transaction: never
+    // take this for a delivery
+    if (!result.txHash || result.txHash.length === 0) return null;
 
     const txHash = bytesToHex(result.txHash);
     // The forwarder transaction succeeds even when the receiver reverts: the revert is
@@ -375,7 +386,7 @@ class Run {
     private readonly registries: Registries | null,
   ) {
     const config = runtime.config;
-    this.summary = { mode: config.mode, funds: 0, ordersSeen: 0, planned: 0, written: 0, deferred: 0, sent: [], errors: [] };
+    this.summary = { mode: config.mode, funds: 0, ordersSeen: 0, planned: 0, written: 0, notBroadcast: 0, deferred: 0, sent: [], errors: [] };
     this.timestamp = BigInt(Math.floor(runtime.now().getTime() / 1000));
     this.seed = BigInt(keccak256(toHex(this.timestamp / 60n)));
   }
@@ -415,6 +426,12 @@ class Run {
         }
       }
       const txHash = this.registries.write(action, this.timestamp);
+      if (txHash === null) {
+        // The run goes on as if the report had been delivered, to show what would follow it
+        this.runtime.log(`[no --broadcast] would send ${label} (not sent)`);
+        this.summary.notBroadcast++;
+        return true;
+      }
       this.runtime.log(`sent ${label} tx=${txHash}`);
       this.summary.sent.push(label);
       this.summary.written++;
@@ -550,7 +567,8 @@ class Run {
     const s = this.summary;
     this.runtime.log(
       `done: ${s.funds} fund(s), ${s.ordersSeen} order(s), ${s.planned} report(s) due, ` +
-        `${s.written} sent, ${s.deferred} deferred, ${s.errors.length} error(s); ` +
+        `${s.written} sent, ${s.notBroadcast > 0 ? `${s.notBroadcast} not sent (simulation without --broadcast), ` : ""}` +
+        `${s.deferred} deferred, ${s.errors.length} error(s); ` +
         `${this.api.calls} API call(s), ${this.registries ? this.registries.reads : 0} chain read(s)`,
     );
     return s;
