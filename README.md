@@ -8,6 +8,7 @@ Neste arquivo:
 
 - [Por onde começar](#por-onde-começar)
 - [Comandos da raiz](#comandos-da-raiz)
+- [Observações](#observações)
 
 Outros documentos:
 
@@ -127,7 +128,9 @@ A ordem importa: primeiro o deploy, depois as redes, depois os stablecoins. O re
 
 Funciona igual no PowerShell, no Prompt de Comando e no bash. As opções do deploy e mais exemplos estão no [README dos smart contracts](smart-contracts/README.md#como-digitar-os-comandos-com-exemplos).
 
-#### Observação no PowerShell - por que não usar os atalhos com opções
+## Observações
+
+#### PowerShell - por que não usar os atalhos com opções
 
 Os atalhos aceitam opções depois de um `--`, mas no PowerShell isso tem uma armadilha. O `--` precisa ir entre aspas simples:
 
@@ -140,3 +143,27 @@ Sem as aspas, o PowerShell descarta o `--` e as opções não chegam ao comando.
 Se usar um atalho com opções, confira na saída a linha que começa com `> hardhat`. Ela deve trazer as opções que você digitou.
 
 Os comandos do Hardhat sem atalho, como `npx hardhat verify`, também são executados dentro de `smart-contracts/`. Os detalhes de compilação, deploy e registro de redes estão no [README dos smart contracts](smart-contracts/README.md).
+
+
+### Lista de fundos
+
+O workflow do Chainlink CRE e a página de Sincronização do frontend não têm uma lista de fundos na configuração. Os dois pedem a lista à Observer API, em `GET /funds`, e usam todos os fundos que a chave pode ver.
+
+**O que isso traz de bom.** Um fundo novo na API entra sozinho, sem editar arquivo nem publicar o workflow de novo. O painel e o workflow olham sempre a mesma lista.
+
+**O que exige atenção.** Não há aprovação: o workflow registra onchain qualquer fundo que a chave enxergue. Se a chave passar a ver um fundo que não deveria ser registrado, ele será registrado. O controle de quais fundos entram fica, na prática, em quem administra a chave na Observer API.
+
+**Limites da lista.**
+
+| Limite | Valor | Consequência |
+|---|---|---|
+| Janela de tempo | 360 dias, pela data de criação do fundo | Um fundo criado há mais tempo deixa de ser visto. A API devolve só 30 dias por padrão e recusa janelas muito maiores que um ano |
+| Quantidade no workflow | 40 fundos, em duas páginas de 20 | Os fundos além disso não são vistos, e o log do workflow avisa |
+| Chamadas à API por execução do workflow | 15, pela cota do CRE | Uma chamada traz a lista e cada fundo usa até duas. Cabem cerca de sete fundos por execução. Os demais ficam para as seguintes, em rodízio |
+
+**A lista de ordens tem a mesma janela, ainda no padrão.** As ordens de cada fundo vêm de `GET /funds/{fundId}/debenture-orders`, que devolve só as atualizadas nos últimos 30 dias. Nem o workflow nem o painel ampliam essa janela hoje. Uma ordem sem atualização há mais de 30 dias deixa de ser vista: se já estava registrada, continua no contrato; se faltava registrar algo dela, não será mais registrado.
+
+**Se for preciso restringir os fundos.** Uma saída é recolocar na configuração do workflow uma lista opcional de `fundId`, usada como filtro: vazia, vale a lista da API; preenchida, só os fundos listados são registrados. Isso não está implementado.
+
+Os detalhes de cada parte estão no [README do workflow](workflow-registry/README.md#limites-de-uma-execução) e no [README do frontend](frontend/README.md#de-onde-vêm-os-dados).
+

@@ -36,7 +36,27 @@ export type PlannedAction = {
   payload: Hex;
   /// Network that must be registered in MultiChainTxRegistry for the action to succeed.
   requiresNetwork?: string;
+  /// What the registries show once the report is applied. Used to confirm the delivery.
+  expect: Expectation;
 };
+
+/// State a delivered report leaves behind: of a fund or of an order.
+export type Expectation =
+  | { fundId: string; creationTxLinked: boolean }
+  | { orderId: string; role?: Hex; progress?: number; version?: number };
+
+/// Whether the state read from the registries is the one the report should have left.
+export const fundApplied = (expect: { creationTxLinked: boolean }, state: FundState): boolean =>
+  state.registered && (!expect.creationTxLinked || state.creationTxLinked);
+
+export const orderApplied = (
+  expect: { role?: Hex; progress?: number; version?: number },
+  state: OrderState,
+): boolean =>
+  state.registered &&
+  (expect.role === undefined || state.roles.includes(expect.role)) &&
+  (expect.progress === undefined || state.progress === expect.progress) &&
+  (expect.version === undefined || state.version === expect.version);
 
 /// What FundRegistry has about a fund.
 export type FundState = {
@@ -115,12 +135,29 @@ export const planFund = (fund: ApiFund, state: FundState): PlannedAction[] => {
       fundCreationTx(fund),
       [],
     );
-    return [{ action: Action.REGISTER_FUND, name: "REGISTER_FUND", ref, payload, requiresNetwork: fund.network }];
+    return [
+      {
+        action: Action.REGISTER_FUND,
+        name: "REGISTER_FUND",
+        ref,
+        payload,
+        requiresNetwork: fund.network,
+        expect: { fundId: fund.fundId, creationTxLinked: fund.creationTxHash !== "" },
+      },
+    ];
   }
 
   if (!state.creationTxLinked && fund.creationTxHash !== "") {
     const payload = recordFundCreationTxPayload(fund.fundId, fundCreationTx(fund), []);
-    return [{ action: Action.RECORD_FUND_CREATION_TX, name: "RECORD_FUND_CREATION_TX", ref, payload }];
+    return [
+      {
+        action: Action.RECORD_FUND_CREATION_TX,
+        name: "RECORD_FUND_CREATION_TX",
+        ref,
+        payload,
+        expect: { fundId: fund.fundId, creationTxLinked: true },
+      },
+    ];
   }
 
   return [];
@@ -233,6 +270,7 @@ export const planOrder = (order: OrderDetail, fundId: string, stableSymbol: stri
       ref,
       payload,
       requiresNetwork: intent.destinationNetwork,
+      expect: { orderId: order.id },
     });
     // State of an order right after registerOrder
     current = { registered: true, progress: 0, version: 0, createdAt, updatedAt: createdAt, roles: [] };
@@ -246,7 +284,13 @@ export const planOrder = (order: OrderDetail, fundId: string, stableSymbol: stri
       sideTx(source, stableSymbol),
       extraArgsOf(source),
     );
-    actions.push({ action: Action.RECORD_ORDER_TX, name: "RECORD_ORDER_TX", ref: `${ref} TRANSFER`, payload });
+    actions.push({
+      action: Action.RECORD_ORDER_TX,
+      name: "RECORD_ORDER_TX",
+      ref: `${ref} TRANSFER`,
+      payload,
+      expect: { orderId: order.id, role: ROLE.TRANSFER },
+    });
   }
 
   // Lock acknowledgment. The API only gives its hash; it is sent to the escrow of the order.
@@ -272,7 +316,13 @@ export const planOrder = (order: OrderDetail, fundId: string, stableSymbol: stri
       lockTx,
       [],
     );
-    actions.push({ action: Action.RECORD_ORDER_TX, name: "RECORD_ORDER_TX", ref: `${ref} LOCK`, payload });
+    actions.push({
+      action: Action.RECORD_ORDER_TX,
+      name: "RECORD_ORDER_TX",
+      ref: `${ref} LOCK`,
+      payload,
+      expect: { orderId: order.id, role: ROLE.LOCK },
+    });
   }
 
   if (confirmed(destination) && !current.roles.includes(ROLE.DELIVERY)) {
@@ -287,7 +337,13 @@ export const planOrder = (order: OrderDetail, fundId: string, stableSymbol: stri
       sideTx(destination, ""),
       extraArgsOf(destination),
     );
-    actions.push({ action: Action.RECORD_ORDER_TX, name: "RECORD_ORDER_TX", ref: `${ref} DELIVERY`, payload });
+    actions.push({
+      action: Action.RECORD_ORDER_TX,
+      name: "RECORD_ORDER_TX",
+      ref: `${ref} DELIVERY`,
+      payload,
+      expect: { orderId: order.id, role: ROLE.DELIVERY },
+    });
   }
 
   const due = progressDue(order.progress, order.version, order.updatedAt, current);
@@ -298,6 +354,7 @@ export const planOrder = (order: OrderDetail, fundId: string, stableSymbol: stri
       name: "UPDATE_ORDER_PROGRESS",
       ref: `${ref} ${order.progress} v${due.version}`,
       payload,
+      expect: { orderId: order.id, progress: due.progress, version: due.version },
     });
   }
 

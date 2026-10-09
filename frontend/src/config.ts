@@ -40,10 +40,9 @@ export const FORWARDERS: Record<string, string> = {
   "0xf8344cfd5c43616a4366c34e3eee75af79a74482": "produção (KeystoneForwarder)",
 };
 
-/// Observer API: the same funds and client id the workflow uses. Requests go through
-/// the proxy of vite.config.ts.
+/// Observer API: the same client id the workflow uses. Requests go through the proxy
+/// of vite.config.ts.
 export const OBSERVER = {
   proxyPath: "/observer-api",
   clientId: workflowConfig.apiClientId,
-  fundIds: workflowConfig.fundIds as string[],
 };

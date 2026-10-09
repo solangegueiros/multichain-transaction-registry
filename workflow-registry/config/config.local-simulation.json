@@ -3,11 +3,5 @@
   "schedule": "0 */5 * * * *",
   "apiBaseUrl": "https://dev-api-mercado-bitcoin.web3up.mobi/v1/external/observer",
   "apiClientId": "mb-observer-demo",
-  "fundIds": [
-    "be6f2e8a-5474-43c7-a692-7918c37e3f42",
-    "6c1f2c8c-355b-46de-a96d-85d8e70f6fa8",
-    "af5b7014-d16f-4494-ab99-130fdda864b6",
-    "a3cdcb8e-4197-413f-87c1-9a1bc793a666"
-  ],
   "maxOrdersPerRun": 2
 }

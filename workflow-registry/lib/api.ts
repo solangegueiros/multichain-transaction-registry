@@ -6,7 +6,7 @@
 
 type Raw = Record<string, unknown>;
 
-/// GET /funds/{fundId}
+/// One fund of GET /funds, or the answer of GET /funds/{fundId}
 export type ApiFund = {
   fundId: string;
   fidcId: string;
@@ -142,6 +142,18 @@ export const projectFund = (raw: Raw): ApiFund => {
 };
 
 const items = (raw: Raw): Raw[] => (Array.isArray(raw.items) ? (raw.items as unknown[]).map(obj) : []);
+
+/// One page of GET /funds: the funds the API key is authorized to see.
+/// nextCursor is "" on the last page.
+export type FundPage = { funds: ApiFund[]; nextCursor: string };
+
+export const projectFundPage = (raw: Raw): FundPage => ({
+  funds: items(raw)
+    .map(projectFund)
+    .filter((fund) => fund.fundId !== ""),
+  nextCursor: str(raw.nextCursor),
+});
+
 
 const sideOf = (item: Raw, which: "source" | "destination"): Raw => obj(obj(item.connectorResults)[which]);
 

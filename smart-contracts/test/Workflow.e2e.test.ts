@@ -109,9 +109,38 @@ async function workflowFixture() {
       actions.push(...planned);
     }
 
+    /// What the workflow reads after a write to confirm that the report was applied
+    async function applied(expect: (typeof actions)[number]["expect"]): Promise<boolean> {
+      if ("fundId" in expect) {
+        const f = (await funds.listFunds(0, 0)).find((x) => x.fundKey === l.keyOf(expect.fundId));
+        return l.fundApplied(
+          expect,
+          f ? { registered: true, creationTxLinked: f.creationTxId !== 0n, stableSymbol: f.stable.symbol } : l.UNREGISTERED_FUND,
+        );
+      }
+      const [o] = await orders.getOrderSyncStates([expect.orderId]);
+      return l.orderApplied(
+        expect,
+        o.registered
+          ? {
+              registered: true,
+              progress: Number(o.progress),
+              version: Number(o.version),
+              createdAt: o.createdAt,
+              updatedAt: o.updatedAt,
+              roles: o.roles.map((r) => r as `0x${string}`),
+            }
+          : l.UNREGISTERED_ORDER,
+      );
+    }
+
     for (const action of actions) {
+      const label = `${action.name} ${action.ref}`;
+      // the check must tell a report that was not applied from one that was
+      expect(await applied(action.expect), `${label} before the report`).to.equal(false);
       const report = l.encodeReport(chainId, BigInt(await time.latest()), action.action, action.payload);
       await receiver.connect(forwarder).onReport("0x", report);
+      expect(await applied(action.expect), `${label} after the report`).to.equal(true);
     }
     return actions.map((a) => `${a.name} ${a.ref}`);
   }

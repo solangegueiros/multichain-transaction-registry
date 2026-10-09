@@ -25,7 +25,7 @@ Painel web que mostra o que está gravado nos contratos deste repositório e com
 | Fundo | `#/funds/{fundId}` | Dados do fundo e as ordens dele, com progresso, versão e transações gravadas |
 | Ordem | `#/orders/{orderId}` | A ordem, o intent e a linha do tempo das transações, com os argumentos extras de cada uma |
 | Transações | `#/transactions` | Transações do `MultiChainTxRegistry`, das mais recentes para as mais antigas, com filtro e busca por hash |
-| Sincronização | `#/sync` | Comparação entre a Observer API e os contratos: os relatórios que o workflow ainda precisa enviar |
+| Sincronização | `#/sync` | Comparação entre a Observer API e os contratos, em duas partes: a lista dos fundos que a chave vê na API, com o resumo de cada um, e os detalhes do fundo escolhido, com o que ainda falta registrar. Quando a rede ou o stablecoin de um fundo, ou a rede de destino de uma ordem, ainda não estão cadastrados nos contratos, a página avisa o que falta cadastrar e o que fica parado por isso |
 | Estrutura | `#/setup` | Redes e chaves de schema, stablecoins, papéis e dispositions, permissões entre os contratos e o estado do receptor do Chainlink CRE |
 
 Os hashes de transação levam ao explorador da rede de origem, quando ele é conhecido. Os endereços de contrato levam ao Etherscan da Sepolia.
@@ -65,7 +65,8 @@ O painel não tem configuração própria. Ele lê os arquivos que as outras par
 | Dado | Origem |
 |---|---|
 | RPC e endereços dos contratos | [project.config.json](../project.config.json) |
-| Fundos acompanhados e identificação na Observer API | [config.staging.json](../workflow-registry/config/config.staging.json) do workflow |
+| Fundos da página de sincronização | Observer API, em `GET /funds`: todos os que a chave pode ver. É a mesma lista que o workflow registra |
+| Identificação na Observer API | [config.staging.json](../workflow-registry/config/config.staging.json) do workflow |
 | ABIs dos contratos | [src/abi/](src/abi/), geradas dos artifacts do Hardhat |
 | Regra de sincronização | [lib/plan.ts](../workflow-registry/lib/plan.ts) e [lib/api.ts](../workflow-registry/lib/api.ts) do workflow |
 
@@ -150,6 +151,7 @@ Nenhum segredo vai nesse arquivo: tudo o que está em uma variável `VITE_` acab
 
 - **Valores na menor unidade.** O valor de cada transação aparece como está gravado, na menor unidade do ativo. Uma transferência de 100 unidades de um token de 18 casas aparece como 100 seguido de 18 zeros.
 - **Filtro por página.** Na página de transações, o filtro de rede e de texto vale só para as 25 transações exibidas. A exceção é um hash completo, que é buscado no contrato inteiro.
+- **Janela da lista de fundos.** A página de sincronização pede à API os fundos criados nos últimos 360 dias. É perto do máximo que a API aceita: uma janela muito maior é recusada. Um fundo mais antigo que isso deixa de aparecer na lista.
 - **Sem histórico.** O painel mostra o estado atual. Os contratos não guardam quando cada mudança aconteceu, e o painel não lê os eventos.
 - **Rayls sem explorador.** A rede `eip155:7295799` não tem explorador configurado, então os hashes dela aparecem sem link.
 

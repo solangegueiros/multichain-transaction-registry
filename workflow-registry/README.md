@@ -17,7 +17,7 @@ Workflow do Chainlink CRE que lê os fundos e as ordens na Observer API e grava 
 
 ## O que o workflow faz
 
-O gatilho é um cron. A cada disparo, para cada fundo configurado, o workflow:
+O gatilho é um cron. A cada disparo, o workflow pede à Observer API a lista dos fundos que a chave pode ver. Não há lista de fundos na configuração: um fundo novo na API entra sozinho. Para cada fundo, o workflow:
 
 1. Lê o fundo e as ordens dele na Observer API, com a chave guardada como segredo.
 2. Lê no `FundRegistry` e no `OrderRegistry` o que já está registrado.
@@ -92,7 +92,6 @@ Campos comuns aos dois modos:
 | `schedule` | Expressão cron de seis campos, com segundos. `0 */5 * * * *` dispara a cada 5 minutos |
 | `apiBaseUrl` | Endereço da Observer API, sem barra no final |
 | `apiClientId` | Valor do cabeçalho `X-Observer-Id` |
-| `fundIds` | Fundos acompanhados, de 1 a 5 |
 | `maxOrdersPerRun` | Quantas ordens de cada fundo recebem relatórios em uma execução, de 1 a 10 |
 
 Campos só do modo `production`:
@@ -105,7 +104,7 @@ Campos só do modo `production`:
 | `txRegistryAddress` | `MultiChainTxRegistry` |
 | `fundRegistryAddress` | `FundRegistry` |
 | `orderRegistryAddress` | `OrderRegistry` |
-| `gasLimit` | Limite de gás de cada transação de relatório |
+| `gasLimit` | Limite de gás de cada transação de relatório. O máximo do CRE é `10000000` |
 | `maxWritesPerRun` | Quantos relatórios são enviados em uma execução, de 1 a 10 |
 
 A configuração é validada na partida. Um campo a mais, um campo faltando ou um endereço vazio impedem o workflow de rodar. O modo `local-simulation` não aceita endereços de contrato: sem eles o código não tem como gravar.
@@ -212,17 +211,33 @@ O CRE limita o que uma execução pode fazer. O workflow respeita os limites e d
 
 As cotas estão em [docs.chain.link/cre/service-quotas](https://docs.chain.link/cre/service-quotas).
 
-**Chamadas à API.** Cada fundo usa até três: o fundo, um índice enxuto das ordens e os detalhes só das ordens que precisam de relatório. Os detalhes vêm em uma chamada separada para caber no limite do consenso, já que a lista completa de ordens passa de 25 KB.
+**Chamadas à API.** Uma chamada traz a lista de fundos, já com os dados de cada um. Depois, cada fundo usa até duas: um índice enxuto das ordens e os detalhes só das ordens que precisam de relatório. Os detalhes vêm em uma chamada separada para caber no limite do consenso, já que a lista completa de ordens passa de 25 KB.
+
+Com os seis fundos que a API devolve hoje, uma execução usa de 11 a 13 das 15 chamadas. Quando os fundos não couberem todos, os que sobrarem ficam para as execuções seguintes, com o rodízio descrito abaixo.
+
+**Lista de fundos.** O workflow lê até duas páginas de `GET /funds`, de 20 fundos cada. Fundos além disso não são vistos, e o log avisa. A API devolve por padrão só os fundos criados nos últimos 30 dias, então o workflow pede os últimos 360 dias, perto do máximo que a API aceita. Um fundo mais antigo que isso deixa de ser acompanhado.
 
 **Leituras.** Uma leitura traz todos os fundos, com `listFunds`. Outra traz o estado de todas as ordens de um fundo, com `getOrderSyncStates`: se cada uma está registrada, o progresso, a versão e as transações já gravadas. Cada chamada leva até 30 ordens, por causa do limite de 5 KB de uma leitura. Um fundo com 13 ordens custa uma leitura, e todas as ordens são conferidas em toda execução.
 
-Com os quatro fundos de exemplo, uma execução usa cerca de 6 das 15 leituras: uma para os fundos, uma por fundo para as ordens e uma por rede de destino conferida antes de registrar uma ordem nova.
+Uma execução usa uma leitura para os fundos, uma por fundo para as ordens, uma por rede de destino conferida antes de registrar uma ordem nova e uma para conferir cada relatório enviado.
 
-**Rodízio.** Quando há mais ordens com relatórios a enviar do que `maxOrdersPerRun`, a escolha começa de uma posição que muda a cada execução. Assim uma ordem cujo relatório sempre falha não impede as outras de serem atendidas.
+**Rodízio.** A lista de fundos é percorrida a partir de uma posição que muda a cada execução, e o mesmo vale para as ordens de um fundo quando há mais ordens com relatórios a enviar do que `maxOrdersPerRun`. Assim todos os fundos têm a sua vez, e uma ordem cujo relatório sempre falha não impede as outras de serem atendidas.
 
 **Bloco das leituras.** O workflow lê o bloco mais recente, e não o finalizado. O bloco finalizado fica minutos atrás, e o workflow reenviaria o que a execução anterior acabou de gravar. Um relatório repetido é recusado pelos contratos de qualquer forma.
 
-**Gás.** Um relatório de transação de ordem gastou cerca de 1,2 milhão de gás em uma rede local, e o de fundo cerca de 1,3 milhão. O `gasLimit` padrão é 2.500.000.
+**Gás.** Na Sepolia, cada relatório custa bem mais do que na rede simulada do Hardhat. Os valores abaixo foram medidos simulando os relatórios sobre o estado real da Sepolia, sem enviar:
+
+| Relatório | Gás na Sepolia | Gás na rede local do Hardhat |
+|---|---|---|
+| `REGISTER_FUND` | 5,7 milhões | 1,3 milhão |
+| `REGISTER_ORDER` | 2,3 milhões | 0,6 milhão |
+| `RECORD_ORDER_TX` de transferência | 5,2 milhões | 1,2 milhão |
+| `RECORD_ORDER_TX` de lock | 2,9 milhões | 0,8 milhão |
+| `RECORD_ORDER_TX` de entrega | 5,9 milhões | 1,2 milhão |
+
+O `gasLimit` está em 10.000.000, o máximo que o CRE aceita por transação. É um teto: a transação paga só o gás que usa. O relatório mais caro medido usa 5,9 milhões, então sobra margem. Não use a medida da rede local para dimensionar o limite.
+
+**Conferência da entrega.** Depois de cada relatório, o workflow lê os contratos e confere se o relatório foi mesmo aplicado. Isso custa uma leitura por relatório. A conferência existe porque a transação do forwarder é minerada com sucesso mesmo quando o receptor recusa o relatório ou fica sem gás. O hash da transação, sozinho, não prova a entrega. Se os contratos não mostrarem o resultado, o relatório é registrado como erro, com o hash, e os seguintes da mesma ordem não são enviados.
 
 ## Como os dados da API viram registros
 
@@ -230,7 +245,7 @@ O workflow chama dois endpoints da Observer API:
 
 | Endpoint | Uso |
 |---|---|
-| `GET /funds/{fundId}` | Dados do fundo |
+| `GET /funds` | Lista dos fundos que a chave pode ver, com os dados de cada um |
 | `GET /funds/{fundId}/debenture-orders` | Ordens do fundo, com as transações de origem e de destino |
 
 Exemplos de resposta estão em [../query-json/](../query-json/).
@@ -277,7 +292,9 @@ O teste precisa das dependências do workflow instaladas, com `bun install --cwd
 | Modo `production` lendo contratos em um nó local, sem enviar | Executado: 3 leituras para conferir as 13 ordens de um fundo |
 | Contratos publicados na Sepolia, com redes e stablecoins registrados | Feito. Os endereços estão no [project.config.json](../project.config.json) e nas configurações do workflow |
 | Simulação `staging-settings` lendo os contratos da Sepolia, sem enviar | Executada: os quatro fundos passaram nas conferências de rede e de stablecoin, e os quatro relatórios `REGISTER_FUND` ficaram prontos para envio |
-| Simulação com `--broadcast` na Sepolia | Não executada |
+| Simulação com `--broadcast` na Sepolia, com `gasLimit` de 2.500.000 | Executada: as 5 transações foram mineradas, mas nenhum relatório foi aplicado, por falta de gás |
+| Os mesmos 5 relatórios simulados sobre o estado da Sepolia, sem enviar | Executado: os 5 são aplicados com gás suficiente |
+| Simulação com `--broadcast` na Sepolia, com `gasLimit` de 10.000.000 | Não executada |
 | Workflow publicado | Não publicado |
 
-O envio de relatórios pelo forwarder ainda não foi exercitado de ponta a ponta. A primeira simulação com `--broadcast` é o teste que falta. Até ela, não há fundos, ordens nem transações registrados nos contratos.
+A primeira simulação com `--broadcast` mostrou que o envio pelo forwarder funciona, mas o limite de gás era baixo para a Sepolia. O limite foi aumentado e o workflow passou a conferir cada entrega. Falta repetir a simulação com `--broadcast` para ver os relatórios aplicados. Até lá, não há fundos, ordens nem transações registrados nos contratos.

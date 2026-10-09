@@ -1,7 +1,7 @@
 // Keeps the registries in step with the Observer API.
 //
-// On each cron tick, for each configured fund:
-//   1. reads the fund and its orders from the Observer API;
+// On each cron tick, for each fund of the Observer API:
+//   1. reads from the Observer API the funds the API key can see, and the orders of each;
 //   2. reads from FundRegistry and OrderRegistry what is already registered;
 //   3. sends one report to MultiChainTxReceiver for each thing that is missing:
 //      the fund, its orders, the transactions of each order and the order progress.
@@ -39,7 +39,7 @@ import {
 import { z } from "zod";
 import { FUND_REGISTRY_ABI, ORDER_REGISTRY_ABI, TX_REGISTRY_ABI } from "./lib/abi.js";
 import {
-  projectFund,
+  projectFundPage,
   projectOrderDetails,
   projectOrderIndex,
   type ApiFund,
@@ -50,7 +50,9 @@ import { ZERO_BYTES32, encodeReport, keyOf } from "./lib/encode.js";
 import {
   UNREGISTERED_FUND,
   UNREGISTERED_ORDER,
+  fundApplied,
   needsWork,
+  orderApplied,
   planFund,
   planOrder,
   type FundState,
@@ -71,7 +73,6 @@ const shared = {
   schedule: z.string().regex(/^(\S+\s+){5}\S+$/, "must be a six-field cron expression"),
   apiBaseUrl: z.string().regex(/^https?:\/\/\S+[^\/\s]$/, "must be a URL without a trailing slash"), // Observer API
   apiClientId: z.string().min(1), // X-Observer-Id header
-  fundIds: z.array(z.string().min(1)).min(1).max(5),
   maxOrdersPerRun: z.number().int().min(1).max(10), // orders that get reports in one run, per fund
 };
 
@@ -90,7 +91,11 @@ export const configSchema = z.discriminatedUnion("mode", [
       txRegistryAddress: contractAddress, // MultiChainTxRegistry
       fundRegistryAddress: contractAddress,
       orderRegistryAddress: contractAddress,
-      gasLimit: z.string().regex(/^[1-9]\d*$/), // gas limit of each report transaction
+      // gas limit of each report transaction; CRE accepts at most 10,000,000
+      gasLimit: z
+        .string()
+        .regex(/^[1-9]\d*$/)
+        .refine((gas) => BigInt(gas) <= 10_000_000n, "must not exceed 10000000, the CRE limit per transaction"),
       maxWritesPerRun: z.number().int().min(1).max(10), // reports sent in one run
     })
     .strict(),
@@ -102,6 +107,14 @@ type ProductionConfig = Extract<Config, { mode: "production" }>;
 // CRE service quotas per execution (https://docs.chain.link/cre/service-quotas)
 const MAX_HTTP_CALLS = 15;
 const MAX_CHAIN_READS = 15;
+
+/// Funds asked per page of GET /funds, so that a page fits the consensus size limit.
+const FUNDS_PER_PAGE = 20;
+/// Pages of GET /funds read in one run. Funds beyond them are not seen.
+const MAX_FUND_PAGES = 2;
+/// GET /funds lists the funds created in the last 30 days unless told otherwise. A fund
+/// must not be dropped as it gets older; about one year is the widest window the API accepts.
+const FUND_WINDOW_DAYS = 360n;
 
 /// Orders asked in one getOrderSyncStates call. An EVM read request is limited to
 /// 5 KB, and each order id takes 128 bytes of it.
@@ -197,8 +210,33 @@ class ObserverApi {
     return JSON.parse(raw) as ApiResult<T>;
   }
 
-  fund(fundId: string): ApiResult<ApiFund> {
-    return this.get(`/funds/${fundId}`, projectFund);
+  /// Every fund the API key is authorized to see, created since `sinceSeconds`.
+  /// One call per page; the list carries the same data as GET /funds/{fundId}.
+  funds(sinceSeconds: bigint): ApiFund[] {
+    const since = new Date(Number(sinceSeconds) * 1000).toISOString();
+    const funds: ApiFund[] = [];
+    let cursor = "";
+
+    for (let page = 0; page < MAX_FUND_PAGES; page++) {
+      // the cursor already carries the filters of the first page: it is sent on its own
+      const query =
+        cursor === ""
+          ? `from=${encodeURIComponent(since)}&limit=${FUNDS_PER_PAGE}`
+          : `cursor=${encodeURIComponent(cursor)}`;
+      const reply = this.get(`/funds?${query}`, projectFundPage);
+      if (!reply.found) break;
+
+      for (const fund of reply.body.funds) {
+        if (!funds.some((f) => f.fundId === fund.fundId)) funds.push(fund);
+      }
+      cursor = reply.body.nextCursor;
+      if (cursor === "") break;
+    }
+
+    if (cursor !== "") {
+      this.runtime.log(`the Observer API has more funds than the ${funds.length} read in this run: the rest is not seen`);
+    }
+    return funds;
   }
 
   orderIndex(fundId: string): ApiResult<OrderIndexEntry[]> {
@@ -336,6 +374,17 @@ class Registries {
     return states;
   }
 
+  /// Whether the registries show what the report should have left. One call.
+  /// The transaction of the forwarder succeeds even when the receiver rejects the report
+  /// or runs out of gas, so its hash alone does not prove a delivery: the state does.
+  applied(action: PlannedAction): boolean {
+    const expect = action.expect;
+    if ("fundId" in expect) {
+      return fundApplied(expect, this.fundStates([expect.fundId]).get(expect.fundId) ?? UNREGISTERED_FUND);
+    }
+    return orderApplied(expect, this.orderStates([expect.orderId]).get(expect.orderId) ?? UNREGISTERED_ORDER);
+  }
+
   /// Sends one report to MultiChainTxReceiver. Returns the transaction hash, or null when
   /// the report was built but not sent, which is what a simulation without --broadcast
   /// does. Throws when the transaction fails or when the receiver rejects the report.
@@ -418,9 +467,12 @@ class Run {
 
     if (this.registries.writesLeft <= 0) return this.defer(label, "write limit of the run reached");
 
+    // one read to confirm the delivery, and one more when a network has to be checked
+    const readsNeeded = action.requiresNetwork !== undefined ? 2 : 1;
+    if (this.registries.readsLeft < readsNeeded) return this.defer(label, "chain read limit of the run reached");
+
     try {
       if (action.requiresNetwork !== undefined) {
-        if (this.registries.readsLeft <= 0) return this.defer(label, "chain read limit of the run reached");
         if (!this.registries.networkRegistered(action.requiresNetwork)) {
           throw new Error(`network ${action.requiresNetwork} is not registered in MultiChainTxRegistry`);
         }
@@ -431,6 +483,12 @@ class Run {
         this.runtime.log(`[no --broadcast] would send ${label} (not sent)`);
         this.summary.notBroadcast++;
         return true;
+      }
+      if (!this.registries.applied(action)) {
+        throw new Error(
+          `transaction ${txHash} was mined, but the registries do not show the report: the receiver ` +
+            "rejected it or ran out of gas (check gasLimit in the config)",
+        );
       }
       this.runtime.log(`sent ${label} tx=${txHash}`);
       this.summary.sent.push(label);
@@ -444,16 +502,8 @@ class Run {
 
   /// Makes sure the fund is registered. Returns its state, or null when the orders
   /// of the fund cannot be processed in this run.
-  private syncFund(fundId: string, state: FundState): FundState | null {
-    const reply = this.api.fund(fundId);
-    if (!reply.found) {
-      if (!state.registered && this.registries) {
-        this.error(`fund ${fundId}`, "not found in the Observer API and not registered");
-        return null;
-      }
-      return state;
-    }
-    const fund = reply.body;
+  private syncFund(fund: ApiFund, state: FundState): FundState | null {
+    const { fundId } = fund;
 
     let actions: PlannedAction[];
     try {
@@ -545,19 +595,31 @@ class Run {
   }
 
   execute(): Summary {
-    const { fundIds } = this.runtime.config;
-    const states = this.registries ? this.registries.fundStates(fundIds) : new Map<string, FundState>();
-    const funds = this.registries ? rotate(fundIds, this.seed) : fundIds;
+    // The window starts at midnight, so the request is the same for a whole day
+    const day = 24n * 60n * 60n;
+    const since = ((this.timestamp - FUND_WINDOW_DAYS * day) / day) * day;
+    const listed = this.api.funds(since);
+    this.runtime.log(`${listed.length} fund(s) in the Observer API`);
 
-    for (const fundId of funds) {
-      // a fund takes up to three API calls: the fund, the order index and the order details
-      if (this.api.remaining < 3) break;
+    const states = this.registries
+      ? this.registries.fundStates(listed.map((fund) => fund.fundId))
+      : new Map<string, FundState>();
+    // Rotated, so that every fund gets its turn when the limits of a run do not fit them all
+    const funds = this.registries ? rotate(listed, this.seed) : listed;
+
+    for (const apiFund of funds) {
+      const { fundId } = apiFund;
+      // a fund takes up to two API calls: the order index and the order details
+      if (this.api.remaining < 2) {
+        this.runtime.log(`fund ${fundId} and the ones after it: left for the next run, API call limit of the run reached`);
+        break;
+      }
       if (this.registries && this.registries.writesLeft <= 0) break;
 
       this.summary.funds++;
       try {
         const before = states.get(fundId) ?? UNREGISTERED_FUND;
-        const fund = this.syncFund(fundId, before);
+        const fund = this.syncFund(apiFund, before);
         if (fund) this.syncOrders(fundId, fund, before.registered);
       } catch (err) {
         this.error(`fund ${fundId}`, err);
