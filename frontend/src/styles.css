@@ -283,6 +283,13 @@ a.card:hover {
 .table-wrap {
   overflow-x: auto;
 }
+.table-scroll-top {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.table-scroll-top > div {
+  height: 1px;
+}
 table {
   width: 100%;
   border-collapse: collapse;

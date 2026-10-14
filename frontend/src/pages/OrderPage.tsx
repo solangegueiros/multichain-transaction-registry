@@ -25,7 +25,7 @@ export default function OrderPage() {
 
       <Async query={detail}>
         {(d) => {
-          if (d === null) return <p className="note">Esta ordem não está registrada no OrderRegistry.</p>;
+          if (d === null) return <p className="note">Esta ordem não está atestada no OrderRegistry.</p>;
           const fund = funds?.find((f) => f.fundKey === d.order.fundKey);
           return (
             <>
@@ -75,7 +75,7 @@ export default function OrderPage() {
               <section className="panel">
                 <h2>Transações</h2>
                 {d.txs.length === 0 ? (
-                  <p className="empty">Nenhuma transação registrada para esta ordem.</p>
+                  <p className="empty">Nenhuma transação atestada para esta ordem.</p>
                 ) : (
                   <ol className="timeline">
                     {d.txs.map((entry) => (
@@ -132,7 +132,7 @@ function TxItem({ entry, chains }: { entry: OrderTxEntry; chains: Chain[] | unde
             <Hash value={arg.value} />
           </Field>
         ))}
-        <Field label="Registrada em">{dateTime(tx.registeredAt)}</Field>
+        <Field label="Data Atestação">{dateTime(tx.registeredAt)}</Field>
       </dl>
     </li>
   );

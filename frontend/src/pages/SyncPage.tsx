@@ -1,7 +1,7 @@
 import { useQueries, useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Async, Badge, Field, Hash, YesNo } from "../components/ui";
+import { Async, Badge, Field, Hash, YesNo, TableWrap } from "../components/ui";
 import { CONTRACTS_EXPLORER } from "../config";
 import { dateTime, shorten } from "../lib/format";
 import {
@@ -64,7 +64,7 @@ export default function SyncPage() {
     <>
       <h1>Sincronização</h1>
       <p className="subtitle">
-        Compara a Observer API com os contratos e lista os relatórios que o workflow do Chainlink CRE ainda precisa enviar.
+        Compara a Observer API com as ações atestadas e lista as ações que o workflow do Chainlink CRE ainda precisa registrar.
       </p>
 
       <section className="panel">
@@ -111,8 +111,8 @@ export default function SyncPage() {
             {list.isPending && <p className="loading">Carregando…</p>}
             {list.isError && (
               <p className="error">
-                {list.error instanceof Error ? list.error.message : String(list.error)} Mostrando só os fundos que já
-                estão nos contratos.
+                {list.error instanceof Error ? list.error.message : String(list.error)} Mostrando só os fundos já
+                atestados.
               </p>
             )}
             {list.isSuccess && funds.length === 0 && <p className="empty">A Observer API não devolveu nenhum fundo.</p>}
@@ -122,16 +122,16 @@ export default function SyncPage() {
                 {onchainList.error instanceof Error ? onchainList.error.message : String(onchainList.error)}
               </p>
             )}
-            {onchainList.isSuccess && funds.length === 0 && <p className="empty">Os contratos não têm nenhum fundo.</p>}
-            <div className="table-wrap" hidden={funds.length === 0}>
+            {onchainList.isSuccess && funds.length === 0 && <p className="empty">Nenhum fundo atestado ainda.</p>}
+            <TableWrap hidden={funds.length === 0}>
               <table>
                 <thead>
                   <tr>
                     <th>Fundo</th>
-                    <th>Onchain</th>
+                    <th>Atestado</th>
                     <th className="num">Ordens na API</th>
-                    <th className="num">Ordens Onchain</th>
-                    <th className="num">Tx Registradas</th>
+                    <th className="num">Ordens Atestadas</th>
+                    <th className="num">Tx Atestadas</th>
                     <th>A registrar</th>
                   </tr>
                 </thead>
@@ -147,7 +147,7 @@ export default function SyncPage() {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </TableWrap>
           </section>
 
           {selectedIndex === -1 ? (
@@ -255,13 +255,13 @@ function FundDetails({ fund, query }: { fund: ApiFundEntry; query: UseQueryResul
               <Field label="Rede">
                 <span className="mono">{fund.network || "—"}</span>
               </Field>
-              <Field label="Onchain">
+              <Field label="Atestado">
                 <YesNo value={sync.registered} />
               </Field>
               <Field label="Ordens">
-                {sync.ordersInApi ?? "—"} na API, {sync.ordersRegistered} onchain
+                {sync.ordersInApi ?? "—"} na API, {sync.ordersRegistered} atestadas
               </Field>
-              <Field label="Tx Registradas">{sync.txsRecorded}</Field>
+              <Field label="Tx Atestadas">{sync.txsRecorded}</Field>
               <Field label="A registrar">
                 <PendingBadge sync={sync} />
               </Field>
@@ -301,8 +301,8 @@ function FundDetails({ fund, query }: { fund: ApiFundEntry; query: UseQueryResul
 
             {sync.apiError !== null && (
               <p className="error">
-                {sync.apiError} Sem a API não dá para saber o que falta registrar; abaixo, só o que os contratos já
-                têm.
+                {sync.apiError} Sem a API não dá para saber o que falta registrar; abaixo, só o que já está
+                atestado.
               </p>
             )}
 
@@ -310,9 +310,9 @@ function FundDetails({ fund, query }: { fund: ApiFundEntry; query: UseQueryResul
             {sync.apiError !== null ? (
               <p className="empty">Indisponível sem a Observer API.</p>
             ) : sync.pending.length === 0 ? (
-              <p className="empty">Nada a registrar: os contratos têm tudo o que a Observer API mostra deste fundo.</p>
+              <p className="empty">Nada a registrar: tudo o que a Observer API mostra deste fundo já está atestado.</p>
             ) : (
-              <div className="table-wrap">
+              <TableWrap>
                 <table>
                   <thead>
                     <tr>
@@ -331,14 +331,14 @@ function FundDetails({ fund, query }: { fund: ApiFundEntry; query: UseQueryResul
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </TableWrap>
             )}
 
             <h3>Registrado</h3>
             {sync.done.length === 0 ? (
               <p className="empty">Nenhum relatório deste fundo foi entregue pelo workflow ainda.</p>
             ) : (
-              <div className="table-wrap">
+              <TableWrap>
                 <table>
                   <thead>
                     <tr>
@@ -346,7 +346,7 @@ function FundDetails({ fund, query }: { fund: ApiFundEntry; query: UseQueryResul
                       <th>Ação</th>
                       <th>Sobre</th>
                       <th>Quando</th>
-                      <th>Transação registrada</th>
+                      <th>Tx Hash</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -363,7 +363,7 @@ function FundDetails({ fund, query }: { fund: ApiFundEntry; query: UseQueryResul
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </TableWrap>
             )}
           </>
         )}

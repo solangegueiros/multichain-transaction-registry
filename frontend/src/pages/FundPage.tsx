@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
-import { Async, Badge, ChainTag, Field, Hash, NetworkTx, ProgressBadge } from "../components/ui";
+import { Async, Badge, ChainTag, Field, Hash, NetworkTx, ProgressBadge, TableWrap } from "../components/ui";
 import { dateTime } from "../lib/format";
 import { useChains } from "../lib/queries";
 import { getFund, getOrdersOfFund } from "../lib/registry";
@@ -20,7 +20,7 @@ export default function FundPage() {
       <Async query={fund}>
         {(f) =>
           f === null ? (
-            <p className="note">Este fundo não está registrado no FundRegistry.</p>
+            <p className="note">Este fundo não está atestado no FundRegistry.</p>
           ) : (
             <>
               <h1>{f.name || f.fundId}</h1>
@@ -47,7 +47,7 @@ export default function FundPage() {
                   <Field label="Transação de criação">
                     <NetworkTx network={f.chain.network} txHash={f.creationTxHash} />{" "}
                     {f.creationTxId === 0n ? (
-                      <Badge tone="warn">não registrada</Badge>
+                      <Badge tone="warn">não atestada</Badge>
                     ) : (
                       <Badge tone="ok">{`transação #${f.creationTxId}`}</Badge>
                     )}
@@ -65,9 +65,9 @@ export default function FundPage() {
         <Async query={orders}>
           {(list) =>
             list.length === 0 ? (
-              <p className="empty">Nenhuma ordem registrada para este fundo.</p>
+              <p className="empty">Nenhuma ordem atestada para este fundo.</p>
             ) : (
-              <div className="table-wrap">
+              <TableWrap>
                 <table>
                   <thead>
                     <tr>
@@ -96,7 +96,7 @@ export default function FundPage() {
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </TableWrap>
             )
           }
         </Async>

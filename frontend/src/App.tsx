@@ -59,7 +59,7 @@ const ICONS = {
 const GROUPS: { title: string; links: { to: string; label: string; icon: ReactNode; end?: boolean }[] }[] = [
   { title: "Registro", links: [{ to: "/", label: "Visão geral", icon: ICONS.overview, end: true }] },
   {
-    title: "O que está gravado",
+    title: "Atestação",
     links: [
       { to: "/funds", label: "Fundos e ordens", icon: ICONS.funds },
       { to: "/transactions", label: "Transações", icon: ICONS.transactions },
@@ -82,7 +82,7 @@ export default function App() {
           <NavLink to="/" aria-label="Visão geral">
             <img src="/brand/abtoken.png" alt="ABToken" width="418" height="278" />
           </NavLink>
-          <span>registro multichain do piloto GTT</span>
+          <span>atestação multichain do piloto GTT</span>
         </div>
 
         <div className="nav-groups">

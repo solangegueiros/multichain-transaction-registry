@@ -1,6 +1,8 @@
 # frontend — painel de leitura
 
-Painel web que mostra o que está gravado nos contratos deste repositório e compara com a Observer API. É somente leitura: não pede carteira e não envia transação.
+Painel web que mostra o que está atestado nos contratos deste repositório e compara com a Observer API. É somente leitura: não pede carteira e não envia transação.
+
+A Sepolia é a camada de atestação: os fundos, as ordens e as transações que o workflow do Chainlink CRE registra ficam gravados nos contratos dela. No painel, "atestado" quer dizer que está nesses contratos, e "registrar" é o que o workflow faz para atestar.
 
 ## Índice
 
@@ -21,11 +23,11 @@ Painel web que mostra o que está gravado nos contratos deste repositório e com
 | Página | Endereço | Conteúdo |
 |---|---|---|
 | Visão geral | `#/` | Contadores de fundos, ordens, transações, redes e stablecoins, e os endereços dos quatro contratos |
-| Fundos | `#/funds` | Fundos registrados no `FundRegistry` |
-| Fundo | `#/funds/{fundId}` | Dados do fundo e as ordens dele, com progresso, versão e transações gravadas |
+| Fundos | `#/funds` | Fundos atestados, do `FundRegistry` |
+| Fundo | `#/funds/{fundId}` | Dados do fundo e as ordens dele, com progresso, versão e transações atestadas |
 | Ordem | `#/orders/{orderId}` | A ordem, o intent e a linha do tempo das transações, com os argumentos extras de cada uma |
-| Transações | `#/transactions` | Transações do `MultiChainTxRegistry`, das mais recentes para as mais antigas, com filtro e busca por hash |
-| Sincronização | `#/sync` | Comparação entre a Observer API e os contratos, em duas partes: a lista dos fundos que a chave vê na API, com o resumo de cada um, e os detalhes do fundo escolhido, com o que ainda falta registrar. Quando a rede ou o stablecoin de um fundo, ou a rede de destino de uma ordem, ainda não estão cadastrados nos contratos, a página avisa o que falta cadastrar e o que fica parado por isso. Os detalhes trazem também a lista "Registrado": cada relatório já entregue pelo workflow, com o link da transação no Etherscan da Sepolia |
+| Transações | `#/transactions` | Transações atestadas no `MultiChainTxRegistry`, das mais recentes para as mais antigas, com filtro e busca por hash. Cada uma traz a data da atestação e o link da transação atestada no Etherscan da Sepolia |
+| Sincronização | `#/sync` | Comparação entre a Observer API e o que está atestado, em duas partes: a lista dos fundos que a chave vê na API, com o resumo de cada um, e os detalhes do fundo escolhido, com o que ainda falta registrar. Quando a rede ou o stablecoin de um fundo, ou a rede de destino de uma ordem, ainda não estão cadastrados nos contratos, a página avisa o que falta cadastrar e o que fica parado por isso. Os detalhes trazem também a lista "Registrado": cada relatório já entregue pelo workflow, com o link da transação no Etherscan da Sepolia |
 | Estrutura | `#/setup` | Redes e chaves de schema, stablecoins, papéis e dispositions, permissões entre os contratos e o estado do receptor do Chainlink CRE |
 
 Os hashes de transação levam ao explorador da rede de origem, quando ele é conhecido. Os endereços de contrato levam ao Etherscan da Sepolia.
@@ -152,10 +154,10 @@ Nenhum segredo vai nesse arquivo: tudo o que está em uma variável `VITE_` acab
 - **Valores na menor unidade.** O valor de cada transação aparece como está gravado, na menor unidade do ativo. Uma transferência de 100 unidades de um token de 18 casas aparece como 100 seguido de 18 zeros.
 - **Filtro por página.** Na página de transações, o filtro de rede e de texto vale só para as 25 transações exibidas. A exceção é um hash completo, que é buscado no contrato inteiro.
 - **Janela da lista de fundos.** A página de sincronização pede à API os fundos criados nos últimos 360 dias. É perto do máximo que a API aceita: uma janela muito maior é recusada. Um fundo mais antigo que isso deixa de aparecer na lista.
-- **Histórico só na Sincronização.** As outras páginas mostram o estado atual. Os contratos não guardam qual transação da Sepolia gravou cada coisa. A lista "Registrado" da Sincronização tira isso dos eventos do `MultiChainTxReceiver`.
+- **Transação da Sepolia só em Transações e na Sincronização.** Os contratos não guardam qual transação da Sepolia atestou cada coisa. A página de Transações acha a de cada transação pelo evento `TxRegistered` do `MultiChainTxRegistry`, no bloco da data da atestação: são 3 ou 4 consultas ao RPC por linha. A lista "Registrado" da Sincronização tira isso dos eventos do `MultiChainTxReceiver`. As páginas de fundo e de ordem mostram só o estado atual.
 - **A leitura de eventos depende do RPC.** O RPC público devolve no máximo 50.000 blocos por consulta, e parte dos nós dele só guarda blocos recentes e recusa a consulta. O painel tenta de novo até dar certo e lê o histórico em faixas, de volta até o deploy do receptor. A primeira abertura da página fica mais lenta conforme o receptor envelhece: são cerca de 5 consultas por mês de histórico. Depois disso, só os blocos novos são lidos. Para um histórico longo, o caminho certo é um RPC com histórico completo ou um indexador.
 - **"Registrado" mostra só o que passou pelo workflow.** Um registro feito direto por uma conta operadora, sem o receptor, não aparece na lista. E só entram as ordens que a Observer API ainda devolve.
-- **Sem a Observer API, só a parte onchain.** Se a chave é recusada ou a API não responde, a Sincronização lista os fundos que já estão nos contratos e mostra deles as ordens, as transações e a lista "Registrado". O que falta registrar fica indisponível, e um fundo que só a API conhece não aparece.
+- **Sem a Observer API, só o que está atestado.** Se a chave é recusada ou a API não responde, a Sincronização lista os fundos já atestados e mostra deles as ordens, as transações e a lista "Registrado". O que falta registrar fica indisponível, e um fundo que só a API conhece não aparece.
 - **Rayls sem explorador.** A rede `eip155:7295799` não tem explorador configurado, então os hashes dela aparecem sem link.
 
 ## Status
@@ -168,4 +170,4 @@ Nenhum segredo vai nesse arquivo: tudo o que está em uma variável `VITE_` acab
 | Comparação da página de sincronização | Executada contra um nó local, com as respostas de exemplo no lugar da API |
 | Página de sincronização com a chave e a API de verdade | Não conferida no navegador |
 
-Na Sepolia ainda não há fundos, ordens nem transações. Até a primeira carga do workflow, as páginas de fundos e de transações aparecem vazias.
+Na Sepolia ainda não há fundos, ordens nem transações atestados. Até a primeira carga do workflow, as páginas de fundos e de transações aparecem vazias.

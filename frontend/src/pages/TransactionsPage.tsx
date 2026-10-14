@@ -1,9 +1,17 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Async, ChainTag, Hash, NetworkTx, TxStatusBadge, networkOf } from "../components/ui";
+import { Async, ChainTag, Hash, NetworkTx, TxStatusBadge, networkOf, TableWrap } from "../components/ui";
+import { CONTRACTS_EXPLORER } from "../config";
 import { amount, dateTime } from "../lib/format";
 import { useChains } from "../lib/queries";
-import { findTxByHash, getTxCount, getTxs, type Chain, type RegisteredTx } from "../lib/registry";
+import {
+  findTxByHash,
+  getRegistrationTxHash,
+  getTxCount,
+  getTxs,
+  type Chain,
+  type RegisteredTx,
+} from "../lib/registry";
 
 const PAGE_SIZE = 25n;
 
@@ -44,7 +52,7 @@ export default function TransactionsPage() {
   return (
     <>
       <h1>Transações</h1>
-      <p className="subtitle">Transações registradas no MultiChainTxRegistry, das mais recentes para as mais antigas.</p>
+      <p className="subtitle">Transações atestadas.</p>
 
       <section className="panel">
         <div className="row">
@@ -68,7 +76,7 @@ export default function TransactionsPage() {
           <Async query={lookup}>
             {(found) =>
               found.length === 0 ? (
-                <p className="empty">Nenhuma transação registrada com este hash.</p>
+                <p className="empty">Nenhuma transação atestada com este hash.</p>
               ) : (
                 <TxTable txs={found} chains={chains} />
               )
@@ -78,7 +86,7 @@ export default function TransactionsPage() {
           <Async query={count}>
             {(n) =>
               n === 0n ? (
-                <p className="empty">Nenhuma transação registrada ainda.</p>
+                <p className="empty">Nenhuma transação atestada ainda.</p>
               ) : (
                 <>
                   <Async query={list}>
@@ -115,7 +123,7 @@ export default function TransactionsPage() {
 
 function TxTable({ txs, chains }: { txs: RegisteredTx[]; chains: Chain[] | undefined }) {
   return (
-    <div className="table-wrap">
+    <TableWrap>
       <table>
         <thead>
           <tr>
@@ -127,7 +135,8 @@ function TxTable({ txs, chains }: { txs: RegisteredTx[]; chains: Chain[] | undef
             <th className="num">Valor</th>
             <th>Tipo</th>
             <th>Status</th>
-            <th>Registrada em</th>
+            <th>Transação atestada</th>
+            <th>Data Atestação</th>
           </tr>
         </thead>
         <tbody>
@@ -153,11 +162,27 @@ function TxTable({ txs, chains }: { txs: RegisteredTx[]; chains: Chain[] | undef
               <td>
                 <TxStatusBadge status={tx.status} />
               </td>
+              <td>
+                <RegistrationTx tx={tx} />
+              </td>
               <td>{dateTime(tx.registeredAt)}</td>
             </tr>
           ))}
         </tbody>
       </table>
-    </div>
+    </TableWrap>
   );
+}
+
+/// Link to the Sepolia transaction that registered the tx. It never changes once found.
+function RegistrationTx({ tx }: { tx: RegisteredTx }) {
+  const hash = useQuery({
+    queryKey: ["registration-tx", tx.id.toString()],
+    queryFn: () => getRegistrationTxHash(tx.id, tx.registeredAt),
+    staleTime: Infinity,
+  });
+  if (hash.isPending) return <span className="network">Carregando…</span>;
+  if (hash.isError) return <span className="network">erro na leitura</span>;
+  if (hash.data === null) return <span className="mono">—</span>;
+  return <Hash value={hash.data} href={`${CONTRACTS_EXPLORER}/tx/${hash.data}`} />;
 }

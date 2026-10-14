@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Async, Badge, ChainTag, ContractAddress, Field, Hash, YesNo } from "../components/ui";
+import { Async, Badge, ChainTag, ContractAddress, Field, Hash, YesNo, TableWrap } from "../components/ui";
 import { CONTRACTS, FORWARDERS } from "../config";
 import { useChains } from "../lib/queries";
 import {
@@ -32,7 +32,7 @@ export default function SetupPage() {
             list.length === 0 ? (
               <p className="empty">Nenhuma rede registrada.</p>
             ) : (
-              <div className="table-wrap">
+              <TableWrap>
                 <table>
                   <thead>
                     <tr>
@@ -63,7 +63,7 @@ export default function SetupPage() {
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </TableWrap>
             )
           }
         </Async>
@@ -76,7 +76,7 @@ export default function SetupPage() {
             list.length === 0 ? (
               <p className="empty">Nenhum stablecoin registrado. Sem eles, nenhum fundo pode ser registrado.</p>
             ) : (
-              <div className="table-wrap">
+              <TableWrap>
                 <table>
                   <thead>
                     <tr>
@@ -101,7 +101,7 @@ export default function SetupPage() {
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </TableWrap>
             )
           }
         </Async>
@@ -111,7 +111,7 @@ export default function SetupPage() {
         <h2>Papéis e dispositions das transações de ordem</h2>
         <Async query={labels}>
           {({ roles: txRoles, dispositions }) => (
-            <div className="table-wrap">
+            <TableWrap>
               <table>
                 <thead>
                   <tr>
@@ -147,7 +147,7 @@ export default function SetupPage() {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </TableWrap>
           )}
         </Async>
       </section>
@@ -156,7 +156,7 @@ export default function SetupPage() {
         <h2>Permissões entre os contratos</h2>
         <Async query={roles}>
           {(checks) => (
-            <div className="table-wrap">
+            <TableWrap>
               <table>
                 <thead>
                   <tr>
@@ -179,7 +179,7 @@ export default function SetupPage() {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </TableWrap>
           )}
         </Async>
       </section>

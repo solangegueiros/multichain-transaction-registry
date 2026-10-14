@@ -1,10 +1,55 @@
 // Small building blocks shared by the pages.
 import type { UseQueryResult } from "@tanstack/react-query";
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { CONTRACTS_EXPLORER } from "../config";
 import { txUrl } from "../lib/explorers";
 import { shorten } from "../lib/format";
 import { PROGRESS, TX_STATUS, type Chain } from "../lib/registry";
+
+/// A table that scrolls sideways, with a second scroll bar above it. The bar above only
+/// shows when the table is wider than the page, and both bars move together.
+export function TableWrap({ children, hidden }: { children: ReactNode; hidden?: boolean }) {
+  const top = useRef<HTMLDivElement>(null);
+  const body = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(0);
+  const [overflows, setOverflows] = useState(false);
+
+  useEffect(() => {
+    const el = body.current;
+    if (!el) return;
+    const measure = () => {
+      setWidth(el.scrollWidth);
+      setOverflows(el.scrollWidth > el.clientWidth);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    if (el.firstElementChild) observer.observe(el.firstElementChild);
+    return () => observer.disconnect();
+  }, []);
+
+  // each bar follows the other; equal values stop the echo
+  const follow = (from: HTMLDivElement | null, to: HTMLDivElement | null) => {
+    if (from && to && to.scrollLeft !== from.scrollLeft) to.scrollLeft = from.scrollLeft;
+  };
+
+  return (
+    <div hidden={hidden}>
+      <div
+        className="table-scroll-top"
+        ref={top}
+        hidden={!overflows}
+        onScroll={() => follow(top.current, body.current)}
+        aria-hidden="true"
+      >
+        <div style={{ width }} />
+      </div>
+      <div className="table-wrap" ref={body} onScroll={() => follow(body.current, top.current)}>
+        {children}
+      </div>
+    </div>
+  );
+}
 
 /// Renders the loading and error states of a query, and its data when it arrives.
 export function Async<T>({ query, children }: { query: UseQueryResult<T>; children: (data: T) => ReactNode }) {

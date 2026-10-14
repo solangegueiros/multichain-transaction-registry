@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { Async, Badge, ContractAddress } from "../components/ui";
+import { Async, Badge, ContractAddress, TableWrap } from "../components/ui";
 import { CONTRACTS, CONTRACT_NAMES } from "../config";
 import { getCounts } from "../lib/registry";
 
@@ -11,7 +11,7 @@ export default function OverviewPage() {
   return (
     <>
       <h1>Visão geral</h1>
-      <p className="subtitle">O que está registrado nos contratos, lido direto da rede.</p>
+      <p className="subtitle">O que está atestado na Sepolia, a camada de atestação, lido direto da rede.</p>
 
       <Async query={counts}>
         {(c) => (
@@ -27,7 +27,7 @@ export default function OverviewPage() {
 
       <section className="panel">
         <h2>Contratos</h2>
-        <div className="table-wrap">
+        <TableWrap>
           <table>
             <thead>
               <tr>
@@ -44,7 +44,7 @@ export default function OverviewPage() {
               ))}
             </tbody>
           </table>
-        </div>
+        </TableWrap>
       </section>
     </>
   );

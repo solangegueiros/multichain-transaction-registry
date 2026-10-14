@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Async, ChainTag, ContractAddress, NetworkTx } from "../components/ui";
+import { Async, ChainTag, ContractAddress, NetworkTx, TableWrap } from "../components/ui";
 import { dateTime } from "../lib/format";
 import { useChains, useFunds } from "../lib/queries";
 
@@ -10,15 +10,15 @@ export default function FundsPage() {
   return (
     <>
       <h1>Fundos</h1>
-      <p className="subtitle">Fundos registrados no FundRegistry.</p>
+      <p className="subtitle">Fundos atestados.</p>
 
       <section className="panel">
         <Async query={funds}>
           {(list) =>
             list.length === 0 ? (
-              <p className="empty">Nenhum fundo registrado ainda.</p>
+              <p className="empty">Nenhum fundo atestado ainda.</p>
             ) : (
-              <div className="table-wrap">
+              <TableWrap>
                 <table>
                   <thead>
                     <tr>
@@ -53,7 +53,7 @@ export default function FundsPage() {
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </TableWrap>
             )
           }
         </Async>

@@ -3,6 +3,7 @@ import {
   createPublicClient,
   decodeAbiParameters,
   encodePacked,
+  getAbiItem,
   hexToString,
   http,
   keccak256,
@@ -341,16 +342,20 @@ const MAX_LOG_RANGES = 25;
 // No call batching and no built-in retry: the retries are done here, one query at a time
 const logsClient = createPublicClient({ transport: http(RPC_URL, { retryCount: 0 }) });
 
-async function receiverLogs(address: Address, fromBlock: bigint, toBlock: bigint) {
+async function withRetry<T>(read: () => Promise<T>): Promise<T> {
   for (let attempt = 1; ; attempt++) {
     try {
-      const raw = await logsClient.getLogs({ address, fromBlock, toBlock });
-      return parseEventLogs({ abi: multiChainTxReceiverAbi, logs: raw });
+      return await read();
     } catch (err) {
       if (attempt >= LOG_ATTEMPTS) throw err;
       await new Promise((resolve) => setTimeout(resolve, 300));
     }
   }
+}
+
+async function receiverLogs(address: Address, fromBlock: bigint, toBlock: bigint) {
+  const raw = await withRetry(() => logsClient.getLogs({ address, fromBlock, toBlock }));
+  return parseEventLogs({ abi: multiChainTxReceiverAbi, logs: raw });
 }
 
 type ReceiverLog = Awaited<ReturnType<typeof receiverLogs>>[number];
@@ -473,6 +478,45 @@ export async function getDeliveredReports(): Promise<DeliveredReport[]> {
     }
   }
   return reports;
+}
+
+// ============================================================
+// SEPOLIA TRANSACTION OF EACH REGISTERED TX (events of the registry)
+// ============================================================
+
+// Sepolia has one slot every 12 seconds. A slot without a block makes a guess land a
+// little off, and the next step starts from that closer block.
+const SLOT_SECONDS = 12n;
+const SEARCH_STEPS = 16;
+const TX_REGISTERED = getAbiItem({ abi: multiChainTxRegistryAbi, name: "TxRegistered" });
+
+/// Number of the block with this exact timestamp, or null when there is none.
+async function blockWithTimestamp(timestamp: bigint): Promise<bigint | null> {
+  const latest = await withRetry(() => logsClient.getBlock());
+  let anchor = latest;
+  for (let step = 0; step < SEARCH_STEPS; step++) {
+    if (anchor.timestamp === timestamp) return anchor.number;
+    let guess = anchor.number - (anchor.timestamp - timestamp) / SLOT_SECONDS;
+    if (guess === anchor.number) guess += timestamp < anchor.timestamp ? -1n : 1n;
+    if (guess > latest.number) guess = latest.number;
+    if (guess < 0n) return null;
+    const blockNumber = guess;
+    anchor = await withRetry(() => logsClient.getBlock({ blockNumber }));
+  }
+  return null;
+}
+
+/// Sepolia transaction that registered the tx with this id, or null when it is not found.
+/// The contract does not store it: it comes from the TxRegistered event, looked up in the
+/// block whose timestamp is registeredAt.
+export async function getRegistrationTxHash(id: bigint, registeredAt: bigint): Promise<Hex | null> {
+  const address = tx().address;
+  const block = await blockWithTimestamp(registeredAt);
+  if (block === null) return null;
+  const logs = await withRetry(() =>
+    logsClient.getLogs({ address, event: TX_REGISTERED, args: { id }, fromBlock: block, toBlock: block }),
+  );
+  return logs[0]?.transactionHash ?? null;
 }
 
 export type RoleCheck = { role: string; contract: string; account: string; granted: boolean };

@@ -14,7 +14,7 @@ Outros documentos:
 
 - [Smart contracts - README](smart-contracts/README.md): contratos, deploy, registro de redes e stablecoins, permissões e a entrada do Chainlink CRE
 - [CRE workflow - README](workflow-registry/README.md): workflow do Chainlink CRE que lê a Observer API e grava nos contratos
-- [Frontend - README](frontend/README.md): painel web de leitura dos contratos, com a comparação entre a Observer API e o que está gravado
+- [Frontend - README](frontend/README.md): painel web de leitura dos contratos, com a comparação entre a Observer API e o que está atestado na Sepolia
 - [Exemplos de dados](smart-contracts/MultiChainTxRegistry.md): exemplos de preenchimento das structs dos contratos, como `ChainInfo`, `TxInput` e `ExtraArg`
 
 O repositório é dividido por partes, uma pasta para cada:
@@ -23,7 +23,7 @@ O repositório é dividido por partes, uma pasta para cada:
 |---|---|
 | [smart-contracts/](smart-contracts/) | Contratos Solidity, testes e scripts de deploy, em um projeto Hardhat. Veja o [README dos smart contracts](smart-contracts/README.md) |
 | [workflow-registry/](workflow-registry/) | Workflow do Chainlink CRE: lê fundos e ordens na Observer API e grava nos contratos. Veja o [README do workflow](workflow-registry/README.md) |
-| [frontend/](frontend/) | Painel web de leitura: mostra o que está gravado nos contratos e compara com a Observer API. Veja o [README do frontend](frontend/README.md) |
+| [frontend/](frontend/) | Painel web de leitura: mostra o que está atestado nos contratos da Sepolia, a camada de atestação, e compara com a Observer API. Veja o [README do frontend](frontend/README.md) |
 | [project.yaml](project.yaml) e [secrets.yaml](secrets.yaml) | Configuração do CRE CLI: o RPC de cada target e o nome dos segredos do workflow. Nenhum dos dois guarda valores secretos |
 | [project.config.json](project.config.json) | Configuração pública compartilhada: URL do RPC da Sepolia, endereço do forwarder do Chainlink CRE e endereços dos contratos publicados. A tarefa de deploy preenche os endereços dos contratos |
 | `project.backup.config.json` | Histórico dos endereços de contratos substituídos em um novo deploy. Só existe depois da primeira substituição |
