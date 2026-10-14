@@ -6,6 +6,7 @@ import {
   hexToString,
   http,
   keccak256,
+  parseEventLogs,
   type Address,
   type Hex,
 } from "viem";
@@ -307,6 +308,171 @@ export async function getReceiverState() {
     client.readContract({ ...r, functionName: "fundRegistry" }),
   ]);
   return { forwarder, author, workflowName, workflowId, maxFutureSkew, orderRegistry, fundRegistry };
+}
+
+// ============================================================
+// REPORTS DELIVERED (events of the receiver)
+// ============================================================
+
+/// One report the receiver applied, with the Sepolia transaction that delivered it.
+export type DeliveredReport = {
+  event: string; // name of the event: "OrderTxRecordedByWorkflow"
+  fundId: string; // "" when the event is about an order
+  fundKey: string; // "" unless the event carries it
+  orderId: string; // "" when the event is about a fund
+  index: number; // position in the list of the order, for OrderTxRecordedByWorkflow
+  progress: number;
+  version: number;
+  timestamp: bigint; // time the workflow gave to the report
+  txHash: Hex; // transaction on the chain of the contracts
+  blockNumber: bigint;
+  logIndex: number;
+};
+
+// Event history is the one thing the public RPC does not serve reliably: part of its nodes
+// keep recent blocks only and answer "pruned history unavailable". A refused query is
+// tried again, and usually lands on a node that has the history. The RPC answers at most
+// 50,000 blocks per query.
+const LOG_RANGE = 40_000n;
+const LOG_ATTEMPTS = 10;
+// Ranges searched backwards for the deployment of the receiver: about five months
+const MAX_LOG_RANGES = 25;
+
+// No call batching and no built-in retry: the retries are done here, one query at a time
+const logsClient = createPublicClient({ transport: http(RPC_URL, { retryCount: 0 }) });
+
+async function receiverLogs(address: Address, fromBlock: bigint, toBlock: bigint) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      const raw = await logsClient.getLogs({ address, fromBlock, toBlock });
+      return parseEventLogs({ abi: multiChainTxReceiverAbi, logs: raw });
+    } catch (err) {
+      if (attempt >= LOG_ATTEMPTS) throw err;
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    }
+  }
+}
+
+type ReceiverLog = Awaited<ReturnType<typeof receiverLogs>>[number];
+
+/// Logs already read, kept while the page is open: a refresh only asks for the new blocks.
+const logCache: { address: string; from: bigint; to: bigint; logs: ReceiverLog[] } = {
+  address: "",
+  from: 0n,
+  to: -1n,
+  logs: [],
+};
+
+const DEPLOY_BLOCK_KEY = "receiver-deploy-block";
+
+/// Block the receiver was deployed in, once found, remembered in this browser so that
+/// the next visits do not search for it again.
+const deployBlock = {
+  get(address: string): bigint | null {
+    try {
+      const saved = JSON.parse(localStorage.getItem(DEPLOY_BLOCK_KEY) ?? "{}");
+      return typeof saved[address] === "string" ? BigInt(saved[address]) : null;
+    } catch {
+      return null;
+    }
+  },
+  set(address: string, block: bigint): void {
+    try {
+      localStorage.setItem(DEPLOY_BLOCK_KEY, JSON.stringify({ [address]: block.toString() }));
+    } catch {
+      // no storage: the search is simply repeated next time
+    }
+  },
+};
+
+// The constructor grants the admin role to the deployer itself: that event only happens
+// at deployment, so no log of the contract is older than it
+const isDeployment = (log: ReceiverLog): boolean =>
+  log.eventName === "RoleGranted" && log.args.role === ZERO_BYTES32 && log.args.account === log.args.sender;
+
+/// Every report the receiver applied since it was deployed, oldest first.
+/// The contracts do not store which transaction registered each thing: the events do.
+export async function getDeliveredReports(): Promise<DeliveredReport[]> {
+  if (!CONTRACTS.receiver) return [];
+  const address = CONTRACTS.receiver;
+  const latest = await logsClient.getBlockNumber();
+
+  if (logCache.address !== address) {
+    logCache.address = address;
+    logCache.logs = [];
+    logCache.from = latest + 1n;
+    logCache.to = latest;
+  }
+
+  // new blocks since the last read
+  for (let from = logCache.to + 1n; from <= latest; from += LOG_RANGE) {
+    const to = from + LOG_RANGE - 1n < latest ? from + LOG_RANGE - 1n : latest;
+    logCache.logs.push(...(await receiverLogs(address, from, to)));
+    logCache.to = to;
+  }
+
+  // older blocks, back to the deployment of the receiver
+  const known = deployBlock.get(address);
+  for (let range = 0; range < MAX_LOG_RANGES; range++) {
+    const floor = known ?? 0n;
+    if (logCache.from <= floor) break;
+
+    const to = logCache.from - 1n;
+    let from = to >= LOG_RANGE ? to - LOG_RANGE + 1n : 0n;
+    if (from < floor) from = floor;
+
+    const chunk = await receiverLogs(address, from, to);
+    logCache.logs.unshift(...chunk);
+    logCache.from = from;
+
+    const deployed = chunk.find(isDeployment);
+    if (deployed) {
+      deployBlock.set(address, deployed.blockNumber);
+      logCache.from = 0n; // nothing older exists
+      break;
+    }
+  }
+
+  const logs = logCache.logs;
+  const reports: DeliveredReport[] = [];
+  for (const log of logs) {
+    const base = {
+      event: log.eventName,
+      fundId: "",
+      fundKey: "",
+      orderId: "",
+      index: -1,
+      progress: -1,
+      version: -1,
+      txHash: log.transactionHash,
+      blockNumber: log.blockNumber,
+      logIndex: log.logIndex,
+    };
+    switch (log.eventName) {
+      case "FundRegisteredByWorkflow":
+        reports.push({ ...base, fundId: log.args.fundId, fundKey: log.args.fundKey, timestamp: log.args.timestamp });
+        break;
+      case "FundCreationTxRecordedByWorkflow":
+        reports.push({ ...base, fundId: log.args.fundId, timestamp: log.args.timestamp });
+        break;
+      case "OrderRegisteredByWorkflow":
+        reports.push({ ...base, orderId: log.args.orderId, timestamp: log.args.timestamp });
+        break;
+      case "OrderTxRecordedByWorkflow":
+        reports.push({ ...base, orderId: log.args.orderId, index: Number(log.args.index), timestamp: log.args.timestamp });
+        break;
+      case "OrderProgressUpdatedByWorkflow":
+        reports.push({
+          ...base,
+          orderId: log.args.orderId,
+          progress: log.args.progress,
+          version: log.args.version,
+          timestamp: log.args.timestamp,
+        });
+        break;
+    }
+  }
+  return reports;
 }
 
 export type RoleCheck = { role: string; contract: string; account: string; granted: boolean };

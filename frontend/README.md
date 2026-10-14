@@ -6,7 +6,7 @@ Painel web que mostra o que está gravado nos contratos deste repositório e com
 
 - [O que o painel mostra](#o-que-o-painel-mostra)
 - [Requisitos](#requisitos)
-- [Rodar](#rodar)
+- [Executar](#executar)
 - [De onde vêm os dados](#de-onde-vêm-os-dados)
 - [Chave da Observer API](#chave-da-observer-api)
 - [Identidade visual](#identidade-visual)
@@ -25,7 +25,7 @@ Painel web que mostra o que está gravado nos contratos deste repositório e com
 | Fundo | `#/funds/{fundId}` | Dados do fundo e as ordens dele, com progresso, versão e transações gravadas |
 | Ordem | `#/orders/{orderId}` | A ordem, o intent e a linha do tempo das transações, com os argumentos extras de cada uma |
 | Transações | `#/transactions` | Transações do `MultiChainTxRegistry`, das mais recentes para as mais antigas, com filtro e busca por hash |
-| Sincronização | `#/sync` | Comparação entre a Observer API e os contratos, em duas partes: a lista dos fundos que a chave vê na API, com o resumo de cada um, e os detalhes do fundo escolhido, com o que ainda falta registrar. Quando a rede ou o stablecoin de um fundo, ou a rede de destino de uma ordem, ainda não estão cadastrados nos contratos, a página avisa o que falta cadastrar e o que fica parado por isso |
+| Sincronização | `#/sync` | Comparação entre a Observer API e os contratos, em duas partes: a lista dos fundos que a chave vê na API, com o resumo de cada um, e os detalhes do fundo escolhido, com o que ainda falta registrar. Quando a rede ou o stablecoin de um fundo, ou a rede de destino de uma ordem, ainda não estão cadastrados nos contratos, a página avisa o que falta cadastrar e o que fica parado por isso. Os detalhes trazem também a lista "Registrado": cada relatório já entregue pelo workflow, com o link da transação no Etherscan da Sepolia |
 | Estrutura | `#/setup` | Redes e chaves de schema, stablecoins, papéis e dispositions, permissões entre os contratos e o estado do receptor do Chainlink CRE |
 
 Os hashes de transação levam ao explorador da rede de origem, quando ele é conhecido. Os endereços de contrato levam ao Etherscan da Sepolia.
@@ -41,7 +41,7 @@ Instale as dependências, da raiz do repositório:
 npm install --prefix ./frontend
 ```
 
-## Rodar
+## Executar
 
 Da raiz do repositório:
 
@@ -152,7 +152,10 @@ Nenhum segredo vai nesse arquivo: tudo o que está em uma variável `VITE_` acab
 - **Valores na menor unidade.** O valor de cada transação aparece como está gravado, na menor unidade do ativo. Uma transferência de 100 unidades de um token de 18 casas aparece como 100 seguido de 18 zeros.
 - **Filtro por página.** Na página de transações, o filtro de rede e de texto vale só para as 25 transações exibidas. A exceção é um hash completo, que é buscado no contrato inteiro.
 - **Janela da lista de fundos.** A página de sincronização pede à API os fundos criados nos últimos 360 dias. É perto do máximo que a API aceita: uma janela muito maior é recusada. Um fundo mais antigo que isso deixa de aparecer na lista.
-- **Sem histórico.** O painel mostra o estado atual. Os contratos não guardam quando cada mudança aconteceu, e o painel não lê os eventos.
+- **Histórico só na Sincronização.** As outras páginas mostram o estado atual. Os contratos não guardam qual transação da Sepolia gravou cada coisa. A lista "Registrado" da Sincronização tira isso dos eventos do `MultiChainTxReceiver`.
+- **A leitura de eventos depende do RPC.** O RPC público devolve no máximo 50.000 blocos por consulta, e parte dos nós dele só guarda blocos recentes e recusa a consulta. O painel tenta de novo até dar certo e lê o histórico em faixas, de volta até o deploy do receptor. A primeira abertura da página fica mais lenta conforme o receptor envelhece: são cerca de 5 consultas por mês de histórico. Depois disso, só os blocos novos são lidos. Para um histórico longo, o caminho certo é um RPC com histórico completo ou um indexador.
+- **"Registrado" mostra só o que passou pelo workflow.** Um registro feito direto por uma conta operadora, sem o receptor, não aparece na lista. E só entram as ordens que a Observer API ainda devolve.
+- **Sem a Observer API, só a parte onchain.** Se a chave é recusada ou a API não responde, a Sincronização lista os fundos que já estão nos contratos e mostra deles as ordens, as transações e a lista "Registrado". O que falta registrar fica indisponível, e um fundo que só a API conhece não aparece.
 - **Rayls sem explorador.** A rede `eip155:7295799` não tem explorador configurado, então os hashes dela aparecem sem link.
 
 ## Status

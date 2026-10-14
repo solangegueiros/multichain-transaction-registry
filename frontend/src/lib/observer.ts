@@ -12,7 +12,18 @@ import {
 } from "../../../workflow-registry/lib/plan";
 import { shortText as toBytes32 } from "../../../workflow-registry/lib/encode";
 import { OBSERVER } from "../config";
-import { getChains, getFund, getOrderStates, getStableCoins } from "./registry";
+import {
+  PROGRESS,
+  getChains,
+  getDeliveredReports,
+  getFund,
+  getFunds,
+  getOrderStates,
+  getOrdersOfFund,
+  getStableCoins,
+  type DeliveredReport,
+  type OrderSummary,
+} from "./registry";
 
 const KEY_STORAGE = "observer-api-key";
 
@@ -83,20 +94,33 @@ export async function listApiFunds(key: string): Promise<ApiFundEntry[]> {
   return funds;
 }
 
+/// The funds the registries already have. Shown when the API cannot be read.
+export async function listOnchainFunds(): Promise<ApiFundEntry[]> {
+  const all = await getFunds();
+  return all.map((f) => ({ fundId: f.fundId, name: f.name, network: f.chain.network }));
+}
+
 export type PendingReport = { name: string; ref: string };
+
+/// A report already applied, with the transaction that delivered it.
+export type DoneReport = { name: string; ref: string; timestamp: bigint; txHash: string };
 
 export type FundSync = {
   fundId: string;
   name: string;
   inApi: boolean;
+  /// Why the API could not be read. When set, only the onchain part is filled: the
+  /// orders are the ones the registries have, and pending stays empty.
+  apiError: string | null;
   registered: boolean;
-  ordersInApi: number;
+  ordersInApi: number | null;
   ordersRegistered: number;
-  /// Order transactions (transfer, lock, delivery): confirmed in the API, and how many of
-  /// them are already recorded. The creation transaction of the fund is not counted.
-  txsExpected: number;
+  /// Order transactions (transfer, lock, delivery) already recorded for the orders the
+  /// API shows (or the registries have, when the API cannot be read). The creation transaction of the fund is not counted.
   txsRecorded: number;
   pending: PendingReport[];
+  /// Reports of this fund the receiver already applied, oldest first.
+  done: DoneReport[];
   problems: string[];
   /// Networks and stablecoins that are not registered yet and hold back reports of this
   /// fund. The workflow does not send those reports until an admin registers what is missing.
@@ -115,13 +139,19 @@ export type Blocker = {
 
 /// What the API has about a fund that the registries do not have yet.
 export async function compareFund(fundId: string, key: string): Promise<FundSync> {
-  const [rawFund, rawOrders, onchainFund, chains, stableCoins] = await Promise.all([
-    apiGet(`/funds/${fundId}`, key),
-    apiGet(`/funds/${fundId}/debenture-orders`, key),
+  // A failure of the API must not hide what the registries have: it is kept apart
+  const api = Promise.all([apiGet(`/funds/${fundId}`, key), apiGet(`/funds/${fundId}/debenture-orders`, key)]).then(
+    (replies) => ({ replies, error: null }),
+    (err: unknown) => ({ replies: [null, null] as const, error: err instanceof Error ? err.message : String(err) }),
+  );
+  const [{ replies, error: apiError }, onchainFund, chains, stableCoins, delivered] = await Promise.all([
+    api,
     getFund(fundId),
     getChains(),
     getStableCoins(),
+    getDeliveredReports(),
   ]);
+  const [rawFund, rawOrders] = replies;
 
   const chainOf = (network: string) => chains.find((c) => c.network === network.trim().toLowerCase());
 
@@ -129,15 +159,36 @@ export async function compareFund(fundId: string, key: string): Promise<FundSync
     fundId,
     name: onchainFund?.name ?? "",
     inApi: rawFund !== null,
+    apiError,
     registered: onchainFund !== null,
-    ordersInApi: 0,
+    ordersInApi: apiError === null ? 0 : null,
     ordersRegistered: 0,
-    txsExpected: 0,
     txsRecorded: 0,
     pending: [],
+    done: [],
     problems: [],
     blockers: [],
   };
+
+  // Reports about the fund itself
+  const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+  for (const report of delivered) {
+    if (report.fundId === "" || !same(report.fundId, fundId)) continue;
+    result.done.push({
+      name: report.event === "FundRegisteredByWorkflow" ? "REGISTER_FUND" : "RECORD_FUND_CREATION_TX",
+      ref: `fund ${report.fundId}`,
+      timestamp: report.timestamp,
+      txHash: report.txHash,
+    });
+  }
+
+  if (apiError !== null) {
+    const orders = onchainFund ? await getOrdersOfFund(fundId) : [];
+    result.ordersRegistered = orders.filter((o) => o.registered).length;
+    for (const o of orders) result.txsRecorded += o.roles.length;
+    addOrderReports(result, delivered, orders);
+    return result;
+  }
 
   const fundState: FundState = onchainFund
     ? { registered: true, creationTxLinked: onchainFund.creationTxId !== 0n, stableSymbol: onchainFund.stable.symbol }
@@ -186,10 +237,6 @@ export async function compareFund(fundId: string, key: string): Promise<FundSync
   const states = await getOrderStates(details.map((d) => d.id));
   const ordersByMissingNetwork = new Map<string, number>();
 
-  for (const entry of index) {
-    result.txsExpected += Number(entry.hasTransfer) + Number(entry.hasLock) + Number(entry.hasDelivery);
-  }
-
   details.forEach((order, i) => {
     const s = states[i];
     const state: OrderState = s.registered
@@ -219,6 +266,12 @@ export async function compareFund(fundId: string, key: string): Promise<FundSync
     }
   });
 
+  addOrderReports(
+    result,
+    delivered,
+    details.map((d, i) => ({ ...states[i], orderId: d.id })),
+  );
+
   for (const [network, count] of ordersByMissingNetwork) {
     const fundBlocker = result.blockers.find((b) => b.kind === "network" && b.network === network);
     const orders = count === 1 ? "1 ordem" : `${count} ordens`;
@@ -227,4 +280,28 @@ export async function compareFund(fundId: string, key: string): Promise<FundSync
   }
 
   return result;
+}
+
+/// Adds the delivered reports of the given orders to result.done, oldest first.
+function addOrderReports(result: FundSync, delivered: DeliveredReport[], orders: OrderSummary[]): void {
+  const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+  for (const report of delivered) {
+    const order = report.orderId === "" ? undefined : orders.find((o) => same(o.orderId, report.orderId));
+    if (!order) continue;
+    const ref = `order ${order.orderId}`;
+    if (report.event === "OrderRegisteredByWorkflow") {
+      result.done.push({ name: "REGISTER_ORDER", ref, timestamp: report.timestamp, txHash: report.txHash });
+    } else if (report.event === "OrderTxRecordedByWorkflow") {
+      const role = order.roles[report.index] ?? `#${report.index}`;
+      result.done.push({ name: "RECORD_ORDER_TX", ref: `${ref} ${role}`, timestamp: report.timestamp, txHash: report.txHash });
+    } else if (report.event === "OrderProgressUpdatedByWorkflow") {
+      result.done.push({
+        name: "UPDATE_ORDER_PROGRESS",
+        ref: `${ref} ${PROGRESS[report.progress] ?? report.progress} v${report.version}`,
+        timestamp: report.timestamp,
+        txHash: report.txHash,
+      });
+    }
+  }
+  result.done.sort((a, b) => Number(a.timestamp - b.timestamp));
 }

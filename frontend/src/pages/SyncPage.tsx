@@ -1,9 +1,17 @@
 import { useQueries, useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Async, Badge, Field, YesNo } from "../components/ui";
-import { shorten } from "../lib/format";
-import { apiKey, compareFund, listApiFunds, type ApiFundEntry, type FundSync } from "../lib/observer";
+import { Async, Badge, Field, Hash, YesNo } from "../components/ui";
+import { CONTRACTS_EXPLORER } from "../config";
+import { dateTime, shorten } from "../lib/format";
+import {
+  apiKey,
+  compareFund,
+  listApiFunds,
+  listOnchainFunds,
+  type ApiFundEntry,
+  type FundSync,
+} from "../lib/observer";
 
 export default function SyncPage() {
   const [key, setKey] = useState(apiKey.get());
@@ -30,7 +38,14 @@ export default function SyncPage() {
     retry: false,
     refetchInterval: 60_000,
   });
-  const funds = list.data ?? [];
+  // When the API cannot be read, the funds the registries already have are shown instead
+  const onchainList = useQuery({
+    queryKey: ["onchain-funds"],
+    queryFn: listOnchainFunds,
+    enabled: key !== "" && list.isError,
+    refetchInterval: 60_000,
+  });
+  const funds = (list.isError ? onchainList.data : list.data) ?? [];
 
   const results = useQueries({
     queries: funds.map(({ fundId }) => ({
@@ -94,8 +109,20 @@ export default function SyncPage() {
               detalhes.
             </p>
             {list.isPending && <p className="loading">Carregando…</p>}
-            {list.isError && <p className="error">{list.error instanceof Error ? list.error.message : String(list.error)}</p>}
+            {list.isError && (
+              <p className="error">
+                {list.error instanceof Error ? list.error.message : String(list.error)} Mostrando só os fundos que já
+                estão nos contratos.
+              </p>
+            )}
             {list.isSuccess && funds.length === 0 && <p className="empty">A Observer API não devolveu nenhum fundo.</p>}
+            {list.isError && onchainList.isPending && <p className="loading">Carregando…</p>}
+            {onchainList.isError && (
+              <p className="error">
+                {onchainList.error instanceof Error ? onchainList.error.message : String(onchainList.error)}
+              </p>
+            )}
+            {onchainList.isSuccess && funds.length === 0 && <p className="empty">Os contratos não têm nenhum fundo.</p>}
             <div className="table-wrap" hidden={funds.length === 0}>
               <table>
                 <thead>
@@ -183,11 +210,9 @@ function FundRow({
           <td>
             <YesNo value={sync.registered} />
           </td>
-          <td className="num">{sync.ordersInApi}</td>
+          <td className="num">{sync.ordersInApi ?? "—"}</td>
           <td className="num">{sync.ordersRegistered}</td>
-          <td className="num">
-            {sync.txsRecorded} de {sync.txsExpected}
-          </td>
+          <td className="num">{sync.txsRecorded}</td>
           <td>
             <PendingBadge sync={sync} />
           </td>
@@ -198,6 +223,7 @@ function FundRow({
 }
 
 function PendingBadge({ sync }: { sync: FundSync }) {
+  if (sync.apiError !== null) return <Badge tone="bad">erro na leitura da API</Badge>;
   if (sync.problems.length > 0) return <Badge tone="bad">{`${sync.pending.length} · com problemas`}</Badge>;
   if (sync.blockers.length > 0) return <Badge tone="bad">{`${sync.pending.length} · falta cadastro`}</Badge>;
   return (
@@ -233,11 +259,9 @@ function FundDetails({ fund, query }: { fund: ApiFundEntry; query: UseQueryResul
                 <YesNo value={sync.registered} />
               </Field>
               <Field label="Ordens">
-                {sync.ordersInApi} na API, {sync.ordersRegistered} onchain
+                {sync.ordersInApi ?? "—"} na API, {sync.ordersRegistered} onchain
               </Field>
-              <Field label="Tx Registradas">
-                {sync.txsRecorded} de {sync.txsExpected}
-              </Field>
+              <Field label="Tx Registradas">{sync.txsRecorded}</Field>
               <Field label="A registrar">
                 <PendingBadge sync={sync} />
               </Field>
@@ -275,7 +299,17 @@ function FundDetails({ fund, query }: { fund: ApiFundEntry; query: UseQueryResul
               </p>
             ))}
 
-            {sync.pending.length === 0 ? (
+            {sync.apiError !== null && (
+              <p className="error">
+                {sync.apiError} Sem a API não dá para saber o que falta registrar; abaixo, só o que os contratos já
+                têm.
+              </p>
+            )}
+
+            <h3>A registrar</h3>
+            {sync.apiError !== null ? (
+              <p className="empty">Indisponível sem a Observer API.</p>
+            ) : sync.pending.length === 0 ? (
               <p className="empty">Nada a registrar: os contratos têm tudo o que a Observer API mostra deste fundo.</p>
             ) : (
               <div className="table-wrap">
@@ -283,7 +317,7 @@ function FundDetails({ fund, query }: { fund: ApiFundEntry; query: UseQueryResul
                   <thead>
                     <tr>
                       <th className="num">#</th>
-                      <th>Ação do receptor</th>
+                      <th>Ação</th>
                       <th>Sobre</th>
                     </tr>
                   </thead>
@@ -293,6 +327,38 @@ function FundDetails({ fund, query }: { fund: ApiFundEntry; query: UseQueryResul
                         <td className="num">{n + 1}</td>
                         <td className="mono">{report.name}</td>
                         <td className="mono">{report.ref}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <h3>Registrado</h3>
+            {sync.done.length === 0 ? (
+              <p className="empty">Nenhum relatório deste fundo foi entregue pelo workflow ainda.</p>
+            ) : (
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th className="num">#</th>
+                      <th>Ação</th>
+                      <th>Sobre</th>
+                      <th>Quando</th>
+                      <th>Transação registrada</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sync.done.map((report, n) => (
+                      <tr key={`${report.txHash} ${report.name} ${report.ref}`}>
+                        <td className="num">{n + 1}</td>
+                        <td className="mono">{report.name}</td>
+                        <td className="mono">{report.ref}</td>
+                        <td>{dateTime(report.timestamp)}</td>
+                        <td>
+                          <Hash value={report.txHash} href={`${CONTRACTS_EXPLORER}/tx/${report.txHash}`} />
+                        </td>
                       </tr>
                     ))}
                   </tbody>
