@@ -67,7 +67,7 @@ bun install --cwd ./workflow-registry
 | [lib/encode.ts](lib/encode.ts) | Codifica os relatórios no formato que o `MultiChainTxReceiver` decodifica |
 | [lib/abi.ts](lib/abi.ts) | Funções de leitura dos contratos |
 | [config/](config/) | Uma configuração por target |
-| [scripts/sync-config.js](scripts/sync-config.js) | Copia os endereços dos contratos do `project.config.json` para as configurações |
+| [scripts/sync-config.js](scripts/sync-config.js) | Copia os endereços dos contratos de cada `project.config.<ambiente>.json` para a configuração do mesmo ambiente |
 | [workflow.yaml](workflow.yaml) | Targets do workflow no CRE CLI |
 | [../project.yaml](../project.yaml) | RPC de cada target. Fica na raiz, que é a raiz do projeto CRE |
 | [../secrets.yaml](../secrets.yaml) | Liga o segredo `OBSERVER_API_KEY` à variável `API_OBSERVER_KEY`. Não guarda valores |
@@ -109,7 +109,7 @@ Campos só do modo `production`:
 
 A configuração é validada na partida. Um campo a mais, um campo faltando ou um endereço vazio impedem o workflow de rodar. O modo `local-simulation` não aceita endereços de contrato: sem eles o código não tem como gravar.
 
-Os quatro endereços vêm do [project.config.json](../project.config.json) da raiz, que os scripts de deploy preenchem. Depois de publicar os contratos, copie-os para as duas configurações de produção, com o comando abaixo.
+Os quatro endereços vêm da raiz, de um arquivo por ambiente, que os scripts de deploy preenchem: [project.config.staging.json](../project.config.staging.json) vai para o `config.staging.json`, e [project.config.production.json](../project.config.production.json) vai para o `config.production.json`. Depois de publicar os contratos de um ambiente, copie os endereços com o comando abaixo.
 
 Execute na raiz do projeto:
 
@@ -117,7 +117,7 @@ Execute na raiz do projeto:
 npm run sync-config
 ```
 
-As duas já estão com os endereços dos contratos publicados na Sepolia. Rode o comando de novo sempre que um contrato for publicado outra vez.
+O `config.staging.json` já está com os endereços dos contratos de staging. O `config.production.json` está com os endereços vazios, porque os contratos de production ainda não foram publicados: até lá, o target `production-settings` não roda. Rode o comando de novo sempre que um contrato for publicado outra vez. Um ambiente sem contratos é pulado, com um aviso, e o outro é atualizado mesmo assim.
 
 ## Simulação local
 
@@ -290,7 +290,8 @@ O teste precisa das dependências do workflow instaladas, com `bun install --cwd
 | Simulação `local-simulation` com a Observer API de verdade | Executada, com os quatro fundos |
 | Relatórios entregues aos contratos na rede simulada do Hardhat | Executado, 6 testes passando, lendo o estado com `getOrderSyncStates` |
 | Modo `production` lendo contratos em um nó local, sem enviar | Executado: 3 leituras para conferir as 13 ordens de um fundo |
-| Contratos publicados na Sepolia, com redes e stablecoins registrados | Feito. Os endereços estão no [project.config.json](../project.config.json) e nas configurações do workflow |
+| Contratos de staging publicados na Sepolia, com redes e stablecoins registrados | Feito. Os endereços estão no [project.config.staging.json](../project.config.staging.json) e no `config.staging.json` |
+| Contratos de production | Não publicados. O `config.production.json` está com os endereços vazios |
 | Simulação `staging-settings` lendo os contratos da Sepolia, sem enviar | Executada: os quatro fundos passaram nas conferências de rede e de stablecoin, e os quatro relatórios `REGISTER_FUND` ficaram prontos para envio |
 | Simulação com `--broadcast` na Sepolia, com `gasLimit` de 2.500.000 | Executada: as 5 transações foram mineradas, mas nenhum relatório foi aplicado, por falta de gás |
 | Os mesmos 5 relatórios simulados sobre o estado da Sepolia, sem enviar | Executado: os 5 são aplicados com gás suficiente |

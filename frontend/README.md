@@ -35,7 +35,7 @@ Os hashes de transação levam ao explorador da rede de origem, quando ele é co
 ## Requisitos
 
 - Node.js 22 ou mais novo.
-- Os contratos publicados, com os endereços no [project.config.json](../project.config.json) da raiz.
+- Os contratos publicados, com os endereços no `project.config.<ambiente>.json` da raiz.
 
 Instale as dependências, da raiz do repositório:
 
@@ -51,14 +51,25 @@ Da raiz do repositório:
 npm run frontend:dev
 ```
 
-O painel abre em `http://localhost:5173`. Para gerar e servir a versão de produção:
+O painel abre em `http://localhost:5173`, lendo os contratos de staging. Para gerar e servir o pacote:
 
 ```bash
 npm run frontend:build
 npm run frontend:preview
 ```
 
-O `build` confere os tipos antes de empacotar. O resultado fica em `frontend/dist/`.
+O `build` confere os tipos antes de empacotar. O resultado fica em `frontend/dist/staging/`.
+
+### Ambiente
+
+O painel lê um ambiente de cada vez: staging ou production. Cada comando tem a versão de production, com `:production` no fim:
+
+| Ambiente | Abrir | Empacotar | Servir o pacote |
+|---|---|---|---|
+| staging | `npm run frontend:dev` | `npm run frontend:build`, em `frontend/dist/staging/` | `npm run frontend:preview` |
+| production | `npm run frontend:dev:production` | `npm run frontend:build:production`, em `frontend/dist/production/` | `npm run frontend:preview:production` |
+
+O ambiente aparece no rodapé do menu lateral, ao lado da rede. Por baixo, cada comando passa `--mode staging` ou `--mode production` para o Vite. Um pacote só tem os endereços do seu ambiente.
 
 ## De onde vêm os dados
 
@@ -66,9 +77,9 @@ O painel não tem configuração própria. Ele lê os arquivos que as outras par
 
 | Dado | Origem |
 |---|---|
-| RPC e endereços dos contratos | [project.config.json](../project.config.json) |
+| RPC e endereços dos contratos | [project.config.staging.json](../project.config.staging.json) ou [project.config.production.json](../project.config.production.json), conforme o ambiente |
 | Fundos da página de sincronização | Observer API, em `GET /funds`: todos os que a chave pode ver. É a mesma lista que o workflow registra |
-| Identificação na Observer API | [config.staging.json](../workflow-registry/config/config.staging.json) do workflow |
+| Identificação na Observer API | [config.staging.json](../workflow-registry/config/config.staging.json) ou [config.production.json](../workflow-registry/config/config.production.json) do workflow, conforme o ambiente |
 | ABIs dos contratos | [src/abi/](src/abi/), geradas dos artifacts do Hardhat |
 | Regra de sincronização | [lib/plan.ts](../workflow-registry/lib/plan.ts) e [lib/api.ts](../workflow-registry/lib/api.ts) do workflow |
 
@@ -116,7 +127,7 @@ O logo e o ícone são cópias dos arquivos do site de referência e ficam em [p
 
 | Caminho | Conteúdo |
 |---|---|
-| [src/config.ts](src/config.ts) | Reúne RPC, endereços e dados da Observer API a partir dos arquivos do repositório |
+| [src/config.ts](src/config.ts) | Escolhe o ambiente e reúne RPC, endereços e dados da Observer API a partir dos arquivos do repositório |
 | [src/lib/registry.ts](src/lib/registry.ts) | Todas as leituras dos contratos |
 | [src/lib/observer.ts](src/lib/observer.ts) | Chamadas à Observer API e a comparação com os contratos |
 | [src/lib/explorers.ts](src/lib/explorers.ts) | Explorador de blocos de cada rede |
@@ -128,7 +139,7 @@ O logo e o ícone são cópias dos arquivos do site de referência e ficam em [p
 | [scripts/sync-abi.mjs](scripts/sync-abi.mjs) | Gera as ABIs a partir dos artifacts do Hardhat |
 | [src/styles.css](src/styles.css) | Cores, fontes e layout |
 | [public/](public/) | Logo e ícone |
-| [vite.config.ts](vite.config.ts) | Empacotamento e o proxy da Observer API |
+| [vite.config.ts](vite.config.ts) | Empacotamento, uma pasta por ambiente, e o proxy da Observer API |
 
 ## Atualizar as ABIs
 
@@ -143,7 +154,7 @@ npm run frontend:sync-abi
 
 ## Apontar para outra rede
 
-Para desenvolver contra outra publicação dos contratos, como um nó local do Hardhat, copie [.env.example](.env.example) para `.env.local` e preencha o RPC e os endereços. Sem esse arquivo, valem os do `project.config.json`.
+Para desenvolver contra outra publicação dos contratos, como um nó local do Hardhat, copie [.env.example](.env.example) para `.env.local` e preencha o RPC e os endereços. Sem esse arquivo, valem os do `project.config.<ambiente>.json`.
 
 Com um RPC próprio, o cabeçalho do painel mostra "rede personalizada", e as leituras deixam de ser agrupadas, porque o nó pode não ter o contrato usado para isso. Os links de endereço continuam apontando para o Etherscan da Sepolia.
 
@@ -170,4 +181,4 @@ Nenhum segredo vai nesse arquivo: tudo o que está em uma variável `VITE_` acab
 | Comparação da página de sincronização | Executada contra um nó local, com as respostas de exemplo no lugar da API |
 | Página de sincronização com a chave e a API de verdade | Não conferida no navegador |
 
-Na Sepolia ainda não há fundos, ordens nem transações atestados. Até a primeira carga do workflow, as páginas de fundos e de transações aparecem vazias.
+Os contratos de production ainda não foram publicados. Até lá, o painel de production mostra que os contratos não estão publicados.

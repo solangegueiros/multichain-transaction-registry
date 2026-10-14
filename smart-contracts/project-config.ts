@@ -1,8 +1,9 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
 /// Public project configuration, shared by every part of the repository
-/// (smart contracts, frontend, workflow). It lives in project.config.json at the
-/// repository root and is safe to commit. Secrets live in .env, also at the root.
+/// (smart contracts, frontend, workflow). There is one file per environment at the
+/// repository root, project.config.<environment>.json, safe to commit. Secrets live
+/// in .env, also at the root.
 export interface ProjectConfig {
   /// Ethereum Sepolia RPC URL, without an embedded API key
   rpcUrl: string;
@@ -33,13 +34,13 @@ export type AddressKey =
 export interface ConfigBackupEntry {
   /// When the backup was taken (ISO 8601, UTC)
   savedAt: string;
-  /// Hardhat network of the deployment, e.g. "sepolia"
+  /// Hardhat network of the deployment, which is also its environment: "staging" or "production"
   network: string;
   /// Option that caused the replacement: "--force" or "--only <contract>"
   reason: string;
   /// Names of the contracts that were replaced
   replaced: string[];
-  /// project.config.json before the replacement
+  /// project.config.<environment>.json before the replacement
   config: ProjectConfig;
 }
 
@@ -47,25 +48,45 @@ export interface ConfigBackupEntry {
 /// directory the command is run from.
 export const repoRootUrl = new URL("../", import.meta.url);
 
-const configUrl = new URL("project.config.json", repoRootUrl);
 const backupUrl = new URL("project.backup.config.json", repoRootUrl);
 
-/// Fields missing from the file (e.g. a file written before a contract existed)
-/// are read as empty.
-export const projectConfig: ProjectConfig = {
-  rpcUrl: "",
-  multiChainTxRegistryAddress: "",
-  fundRegistryAddress: "",
-  orderRegistryAddress: "",
-  creForwarderAddress: "",
-  multiChainTxReceiverAddress: "",
-  ...JSON.parse(readFileSync(configUrl, "utf8")),
-};
+/// Each environment has its own contracts and its own project.config.<environment>.json.
+/// Both are on Ethereum Sepolia.
+export type Environment = "staging" | "production";
 
-/// Writes the configuration back to project.config.json (used by the deploy script
-/// to record the address of each contract it deploys).
-export function saveProjectConfig(config: ProjectConfig): void {
-  writeFileSync(configUrl, JSON.stringify(config, null, 2) + "\n");
+export const ENVIRONMENTS: Environment[] = ["staging", "production"];
+
+/// Environment of a Hardhat network: the networks are named after the environments.
+/// The local simulated network reads staging, but the scripts ignore its addresses there.
+export function environmentOf(networkName: string): Environment {
+  return networkName === "production" ? "production" : "staging";
+}
+
+/// Name of the file of the environment, as shown in messages.
+export function projectConfigFile(environment: Environment): string {
+  return `project.config.${environment}.json`;
+}
+
+const configUrl = (environment: Environment) => new URL(projectConfigFile(environment), repoRootUrl);
+
+/// Configuration of the environment. Fields missing from the file (e.g. a file
+/// written before a contract existed) are read as empty.
+export function loadProjectConfig(environment: Environment): ProjectConfig {
+  return {
+    rpcUrl: "",
+    multiChainTxRegistryAddress: "",
+    fundRegistryAddress: "",
+    orderRegistryAddress: "",
+    creForwarderAddress: "",
+    multiChainTxReceiverAddress: "",
+    ...JSON.parse(readFileSync(configUrl(environment), "utf8")),
+  };
+}
+
+/// Writes the configuration back to the file of the environment (used by the deploy
+/// scripts to record the address of each contract they deploy).
+export function saveProjectConfig(environment: Environment, config: ProjectConfig): void {
+  writeFileSync(configUrl(environment), JSON.stringify(config, null, 2) + "\n");
 }
 
 /// Appends an entry to project.backup.config.json (created on first use). The file

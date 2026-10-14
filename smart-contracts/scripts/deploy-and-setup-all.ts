@@ -11,7 +11,8 @@ import { fileURLToPath } from "node:url";
 //   5. deploy-cre-receiver.ts   MultiChainTxReceiver, the entry point of Chainlink CRE
 //
 // Each step is the same command the README gives for it, run as its own process, so
-// each one reads the addresses the previous one saved in project.config.json.
+// each one reads the addresses the previous one saved in project.config.<environment>.json.
+// The environment is the name of the network: --network staging or --network production.
 //
 // Every step skips what is already done. If the script stops halfway, run it again:
 // it continues from where it stopped. It never replaces a contract that is already

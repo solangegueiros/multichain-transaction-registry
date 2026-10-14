@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { NavLink, Route, Routes } from "react-router-dom";
-import { CUSTOM_RPC } from "./config";
+import { CUSTOM_RPC, ENVIRONMENT } from "./config";
 import FundPage from "./pages/FundPage";
 import FundsPage from "./pages/FundsPage";
 import OrderPage from "./pages/OrderPage";
@@ -104,6 +104,7 @@ export default function App() {
           <div className="foot-title">MultiChainTxRegistry</div>
           <div className="foot-sub">somente leitura</div>
           <span className="foot-chip">{CUSTOM_RPC ? "rede personalizada" : "Ethereum Sepolia"}</span>
+          <span className="foot-chip">{ENVIRONMENT === "production" ? "produção" : "staging"}</span>
         </div>
       </nav>
 

@@ -7,6 +7,7 @@ Smart contracts do projeto, um projeto Hardhat.
 - [Introdução](#introdução)
 - [Requisitos](#requisitos)
 - [Configuração](#configuração)
+- [Ambientes: staging e production](#ambientes-staging-e-production)
 - [Setup Smart Contracts](#setup-smart-contracts)
 - [Testes locais](#testes-locais)
 - [Perfis e Permissões](#perfis-e-permissões)
@@ -54,7 +55,7 @@ npm install
 cp ../.env.example ../.env
 ```
 
-O `.env` e o `project.config.json` ficam na raiz do repositório, fora desta pasta, porque são compartilhados com as outras partes do projeto. O Hardhat os encontra a partir da localização do `hardhat.config.ts`, então os comandos funcionam de qualquer pasta.
+O `.env` e os arquivos `project.config.<ambiente>.json` ficam na raiz do repositório, fora desta pasta, porque são compartilhados com as outras partes do projeto. O Hardhat os encontra a partir da localização do `hardhat.config.ts`, então os comandos funcionam de qualquer pasta.
 
 Preencha o `.env`:
 
@@ -65,7 +66,7 @@ Preencha o `.env`:
 
 > `.env` guarda apenas segredos e está no `.gitignore`. 
 
-Os valores públicos ficam em [project.config.json](../project.config.json):
+Os valores públicos ficam em um arquivo por ambiente, [project.config.staging.json](../project.config.staging.json) e [project.config.production.json](../project.config.production.json), com os mesmos campos:
 
 | Campo | Para que serve |
 |---|---|
@@ -78,6 +79,26 @@ Os valores públicos ficam em [project.config.json](../project.config.json):
 
 Os endereços dos contratos são preenchidos pela tarefa de deploy e pelo script do receptor. Só o `creForwarderAddress` é preenchido à mão; os valores estão em [5. Publicar a estrutura de integração com Chainlink CRE](#5-publicar-a-estrutura-de-integração-com-chainlink-cre).
 
+## Ambientes: staging e production
+
+Há dois conjuntos de contratos, os dois na Ethereum Sepolia: um para staging e outro para production. Cada um tem o seu arquivo de configuração, e o ambiente é escolhido pelo nome da rede no comando:
+
+| Rede no comando | Arquivo lido e preenchido | Forwarder do Chainlink CRE |
+|---|---|---|
+| `--network staging` | [project.config.staging.json](../project.config.staging.json) | vazio: o de simulação, para `cre workflow simulate --broadcast` |
+| `--network production` | [project.config.production.json](../project.config.production.json) | o de verdade, para o workflow publicado |
+
+```powershell
+npx hardhat deploy --network staging
+npx hardhat deploy --network production
+```
+
+Todo comando deste documento funciona com qualquer uma das duas redes. Os exemplos usam `--network staging`; troque por `--network production` para o outro ambiente. Os contratos de production ainda não foram publicados: os endereços do arquivo estão vazios.
+
+Os scripts mostram no começo da saída a rede e o arquivo que estão usando, nas linhas `Network:` e `Addresses:`. Confira antes de seguir, principalmente em production.
+
+Sem `--network`, os comandos rodam na rede simulada do Hardhat e ignoram os endereços dos dois arquivos.
+
 ## Setup Smart Contracts
 
 ### 1. Compilar
@@ -89,7 +110,7 @@ npx hardhat compile
 ### 2. Publicar
 
 ```sh
-npx hardhat deploy --network sepolia
+npx hardhat deploy --network staging
 ```
 
 A tarefa `deploy` publica três contratos, nesta ordem: `MultiChainTxRegistry`, `FundRegistry` e `OrderRegistry`. Depois de cada um, espera 5 confirmações e o verifica no Etherscan. Se a verificação falhar, o deploy continua valendo e a tarefa mostra o comando para tentar de novo. O receptor do Chainlink CRE é publicado à parte, no [passo 5](#5-publicar-a-estrutura-de-integração-com-chainlink-cre).
@@ -98,7 +119,7 @@ Antes de publicar, ela mostra o plano: o que será publicado, o que será reapro
 
 | Opção | O que faz |
 |---|---|
-| nenhuma | Publica só os contratos com endereço vazio no [project.config.json](../project.config.json) e reaproveita os outros |
+| nenhuma | Publica só os contratos com endereço vazio no `project.config.<ambiente>.json` e reaproveita os outros |
 | `--only <contrato>` | Publica de novo esse contrato e, automaticamente, os que dependem dele |
 | `--force` | Publica os três de novo, ignorando os endereços preenchidos |
 | `--yes` | Confirma a substituição de contratos já publicados. Obrigatória fora da rede simulada |
@@ -106,8 +127,8 @@ Antes de publicar, ela mostra o plano: o que será publicado, o que será reapro
 Os valores de `--only` são `multichain-tx-registry`, `fund-registry` e `order-registry`.
 
 ```sh
-npx hardhat deploy --network sepolia --only order-registry --yes
-npx hardhat deploy --network sepolia --force --yes
+npx hardhat deploy --network staging --only order-registry --yes
+npx hardhat deploy --network staging --force --yes
 ```
 
 #### Como digitar os comandos, com exemplos
@@ -118,26 +139,26 @@ npx hardhat deploy --network sepolia --force --yes
 cd smart-contracts
 
 # Primeiro deploy, ou continuar um deploy que parou no meio
-npx hardhat deploy --network sepolia
+npx hardhat deploy --network staging
 
 # Publicar de novo só o OrderRegistry
-npx hardhat deploy --network sepolia --only order-registry --yes
+npx hardhat deploy --network staging --only order-registry --yes
 
 # Publicar de novo o FundRegistry (o OrderRegistry vai junto)
-npx hardhat deploy --network sepolia --only fund-registry --yes
+npx hardhat deploy --network staging --only fund-registry --yes
 
 # Publicar os três de novo
-npx hardhat deploy --network sepolia --force --yes
+npx hardhat deploy --network staging --force --yes
 
 # Só ver o plano, sem publicar nada: deixe o --yes de fora
-npx hardhat deploy --network sepolia --only order-registry
+npx hardhat deploy --network staging --only order-registry
 ```
 
-Confira na saída a linha `Network:`, que deve mostrar a rede que você pediu, antes de o deploy começar a publicar.
+Confira na saída as linhas `Network:` e `Addresses:`, que devem mostrar a rede e o arquivo do ambiente que você pediu, antes de o deploy começar a publicar.
 
 **Alternativa: da raiz do repositório, com `npm run`.** Os atalhos da raiz também aceitam as opções, depois de um `--`. No PowerShell esse jeito tem uma armadilha, explicada na observação [Comandos no Powershell](#comandos-no-powershell).
 
-**Sem opção, contratos já publicados são reaproveitados.** Cada endereço novo é gravado no `project.config.json` assim que o contrato é publicado. Por isso a tarefa pode ser executada de novo sem risco, e uma execução que parar no meio continua de onde parou.
+**Sem opção, contratos já publicados são reaproveitados.** Cada endereço novo é gravado no `project.config.<ambiente>.json` assim que o contrato é publicado. Por isso a tarefa pode ser executada de novo sem risco, e uma execução que parar no meio continua de onde parou.
 
 **Publicar de novo não atualiza o contrato.** Os contratos não são atualizáveis: o novo começa vazio, em outro endereço. O antigo continua na rede com os dados dele, só deixa de ser referenciado. Os dados precisam ser carregados de novo no contrato novo.
 
@@ -151,7 +172,7 @@ Confira na saída a linha `Network:`, que deve mostrar a rede que você pediu, a
 
 **Confirmação.** Quando o plano substitui algum contrato já publicado, a tarefa para depois de mostrar o plano e não publica nada. Para seguir, repita o comando com `--yes`. Na rede simulada a confirmação não é pedida.
 
-**Backup dos endereços.** Antes de substituir, a tarefa acrescenta uma entrada ao `project.backup.config.json`, na raiz do repositório, com o `project.config.json` como estava, a data, a rede, a opção usada e os contratos substituídos. O arquivo é uma lista e nunca é sobrescrito, então os endereços antigos não se perdem.
+**Backup dos endereços.** Antes de substituir, a tarefa acrescenta uma entrada ao `project.backup.config.json`, na raiz do repositório, com o `project.config.<ambiente>.json` como estava, a data, a rede (que é o ambiente), a opção usada e os contratos substituídos. O arquivo é uma lista e nunca é sobrescrito, então os endereços antigos não se perdem.
 
 **Relayers.** No fim, a tarefa concede o papel `RELAYER_ROLE` no `MultiChainTxRegistry` ao `FundRegistry` e ao `OrderRegistry` novos, se ainda não tiverem. Isso só é possível quando a conta que roda a tarefa é admin do `MultiChainTxRegistry`. Se não for, a tarefa mostra as chamadas de `grantRole` que um admin precisa fazer.
 
@@ -168,7 +189,7 @@ Um contrato substituído continua com o `RELAYER_ROLE` enquanto o `MultiChainTxR
 Em `.\smart-contracts`:
 
 ```powershell
-npx hardhat run scripts/register-chains.ts --network sepolia
+npx hardhat run scripts/register-chains.ts --network staging
 ```
 
 Como no deploy, rode de dentro de `smart-contracts/`, com `npx hardhat`.
@@ -196,7 +217,7 @@ A Rayls é registrada com o genesis hash zerado, porque ele não vem nos dados d
 Em `.\smart-contracts`:
 
 ```powershell
-npx hardhat run scripts/register-stablecoins.ts --network sepolia
+npx hardhat run scripts/register-stablecoins.ts --network staging
 ```
 
 Registra no `FundRegistry`, no endereço `fundRegistryAddress`, os stablecoins usados pelos fundos. Um stablecoin precisa estar registrado antes dos fundos que o usam.
@@ -221,10 +242,10 @@ Um stablecoin registrado não pode ser alterado. Se o símbolo ou os decimais de
 
 ```powershell
 cd smart-contracts
-npx hardhat run scripts/deploy-cre-receiver.ts --network sepolia
+npx hardhat run scripts/deploy-cre-receiver.ts --network staging
 ```
 
-Publica o `MultiChainTxReceiver`, o contrato por onde um workflow do Chainlink CRE grava no `MultiChainTxRegistry`. O funcionamento dele está em [Registrando transações com Chainlink CRE](#registrando-transações-com-chainlink-cre). Rode depois do passo 2: o script usa o `MultiChainTxRegistry` do `project.config.json` e para se ele ainda não foi publicado.
+Publica o `MultiChainTxReceiver`, o contrato por onde um workflow do Chainlink CRE grava no `MultiChainTxRegistry`. O funcionamento dele está em [Registrando transações com Chainlink CRE](#registrando-transações-com-chainlink-cre). Rode depois do passo 2: o script usa o `MultiChainTxRegistry` do `project.config.<ambiente>.json` e para se ele ainda não foi publicado.
 
 Dados do Chainlink CRE na Ethereum Sepolia:
 
@@ -254,7 +275,7 @@ Os endereços vêm da documentação do Chainlink CRE, conferida em 07/10/2026. 
 
 Um receptor que confia no mock serve só para testes. O que chega por ele não passou pela rede de oráculos, então não deve ser tratado como dado verificado. E, como o mock não envia a identidade do workflow, as restrições `setExpectedWorkflowId`, `setExpectedAuthor` e `setExpectedWorkflowName` precisam ficar desligadas enquanto ele for o forwarder: com elas ligadas, todo relatório da simulação é recusado.
 
-**Qual forwarder o script usa.** Depende do campo `creForwarderAddress` do [project.config.json](../project.config.json):
+**Qual forwarder o script usa.** Depende do campo `creForwarderAddress` do `project.config.<ambiente>.json`:
 
 | `creForwarderAddress` | Receptor novo | Receptor já publicado |
 |---|---|---|
@@ -265,13 +286,15 @@ Com o campo vazio, o script nunca mexe no forwarder de um receptor que já exist
 
 **Quando trocar para o Ethereum Sepolia Forwarder Address.** Troque quando for publicar o workflow com `cre workflow deploy`, isto é, quando ele deixar de rodar em simulação na sua máquina e passar a rodar na rede de oráculos. Enquanto você só simula, fique no mock.
 
+Com os dois ambientes, cada um fica com o seu forwarder: o `project.config.staging.json` fica vazio, no mock, para simular, e o `project.config.production.json` já vem com o Ethereum Sepolia Forwarder Address. Os passos abaixo valem para quem usa um ambiente só.
+
 O caminho recomendado:
 
 1. Publique o receptor com `creForwarderAddress` vazio. Ele nasce com o Mock Forwarder.
 2. Simule o workflow com `cre workflow simulate --broadcast` até os relatórios chegarem e as transações serem registradas.
 
 #### Deploy em Chainlink CRE
-3. Preencha `creForwarderAddress` com `0xF8344CFd5c43616a4366C34E3EEE75af79a74482` no `project.config.json`.
+3. Preencha `creForwarderAddress` com `0xF8344CFd5c43616a4366C34E3EEE75af79a74482` no `project.config.<ambiente>.json`.
 4. Rode o script de novo. Ele troca o forwarder do receptor já publicado, sem publicar outro.
 5. Publique o workflow e restrinja o receptor a ele, com `setExpectedWorkflowId` ou `setExpectedAuthor`.
 
@@ -280,7 +303,7 @@ O caminho recomendado:
 O que mais o script faz:
 
 - **Reaproveita o receptor.** Com `multiChainTxReceiverAddress` preenchido, ele não publica outro. Com o campo vazio, publica, grava o endereço no arquivo e verifica no Etherscan. Para publicar de novo, apague o campo.
-- **Aponta o receptor para o `OrderRegistry` e o `FundRegistry`** do `project.config.json`, com `setOrderRegistry` e `setFundRegistry`. Se um deles for publicado de novo, basta rodar o script outra vez para o receptor passar a usar o novo.
+- **Aponta o receptor para o `OrderRegistry` e o `FundRegistry`** do `project.config.<ambiente>.json`, com `setOrderRegistry` e `setFundRegistry`. Se um deles for publicado de novo, basta rodar o script outra vez para o receptor passar a usar o novo.
 - **Concede os papéis**: `RELAYER_ROLE` no `MultiChainTxRegistry` e `OPERATOR_ROLE` no `OrderRegistry` e no `FundRegistry`. Cada concessão só é feita se a conta for admin do contrato em questão. Se não for, o script mostra a chamada que um admin precisa fazer.
 - **Confere a ligação.** Se o receptor do arquivo estiver ligado a outro `MultiChainTxRegistry`, o script para e pede para apagar o campo.
 - **Mostra o estado final**: o forwarder em uso, se é o mock ou o de verdade, e se há restrição de workflow. Com o forwarder de verdade e sem restrição, ele avisa que qualquer workflow consegue gravar.
@@ -292,18 +315,18 @@ O script pode ser executado quantas vezes for preciso: ele só envia as transaç
 Se você já conhece o projeto e quer agilizar a publicação, o script [scripts/deploy-and-setup-all.ts](scripts/deploy-and-setup-all.ts) roda os cinco passos anteriores em sequência, com um comando só:
 
 ```powershell
-npx hardhat run scripts/deploy-and-setup-all.ts --network sepolia
+npx hardhat run scripts/deploy-and-setup-all.ts --network staging
 ```
 
-Rode de dentro de `smart-contracts/`, com o `.env` e o `project.config.json` da raiz preenchidos como descrito em [Configuração](#configuração).
+Rode de dentro de `smart-contracts/`, com o `.env` e o `project.config.<ambiente>.json` da raiz preenchidos como descrito em [Configuração](#configuração).
 
 | Passo | O que o script executa |
 |---|---|
 | 1 | `npx hardhat build` |
-| 2 | `npx hardhat deploy --network sepolia` |
-| 3 | `npx hardhat run scripts/register-chains.ts --network sepolia` |
-| 4 | `npx hardhat run scripts/register-stablecoins.ts --network sepolia` |
-| 5 | `npx hardhat run scripts/deploy-cre-receiver.ts --network sepolia` |
+| 2 | `npx hardhat deploy --network staging` |
+| 3 | `npx hardhat run scripts/register-chains.ts --network staging` |
+| 4 | `npx hardhat run scripts/register-stablecoins.ts --network staging` |
+| 5 | `npx hardhat run scripts/deploy-cre-receiver.ts --network staging` |
 
 A saída de cada um aparece no terminal, depois de uma linha `=== Step N of 5 ===`.
 
@@ -342,7 +365,7 @@ npx hardhat run scripts/register-stablecoins.ts
 npx hardhat run scripts/deploy-cre-receiver.ts
 ```
 
-Localmente, todos ignoram os endereços do `project.config.json` e publicam contratos novos a cada execução. Cada execução é independente: a rede simulada não guarda nada entre um comando e outro. A verificação é pulada, nada é gravado no arquivo e nenhuma confirmação é pedida.
+Localmente, todos ignoram os endereços dos arquivos `project.config.<ambiente>.json` e publicam contratos novos a cada execução. Cada execução é independente: a rede simulada não guarda nada entre um comando e outro. A verificação é pulada, nada é gravado no arquivo e nenhuma confirmação é pedida.
 
 ## Perfis e Permissões
 
@@ -437,7 +460,7 @@ O receptor precisa de um papel em cada contrato que usa. O script de deploy do r
 | `OPERATOR_ROLE` | `OrderRegistry` | `RECORD_ORDER_TX`, `REGISTER_ORDER` e `UPDATE_ORDER_PROGRESS` |
 | `OPERATOR_ROLE` | `FundRegistry` | `RECORD_FUND_CREATION_TX` e `REGISTER_FUND` |
 
-O receptor também precisa saber onde estão o `OrderRegistry` e o `FundRegistry`. Um admin informa com `setOrderRegistry` e `setFundRegistry`; o script de deploy faz isso com os endereços do `project.config.json`. Enquanto um deles não estiver definido, a ação correspondente reverte com `OrderRegistryNotSet` ou `FundRegistryNotSet`. Os dois precisam usar o mesmo `MultiChainTxRegistry` do receptor.
+O receptor também precisa saber onde estão o `OrderRegistry` e o `FundRegistry`. Um admin informa com `setOrderRegistry` e `setFundRegistry`; o script de deploy faz isso com os endereços do `project.config.<ambiente>.json`. Enquanto um deles não estiver definido, a ação correspondente reverte com `OrderRegistryNotSet` ou `FundRegistryNotSet`. Os dois precisam usar o mesmo `MultiChainTxRegistry` do receptor.
 
 **Formato do relatório.** Todo relatório é a struct `Report` codificada com `abi.encode`:
 
@@ -655,15 +678,15 @@ A função existe para quem tem poucas chamadas disponíveis, como o [workflow d
 | [contracts/OrderRegistry.sol](contracts/OrderRegistry.sol) | Ordens dos fundos do `FundRegistry`; cada transação de ordem vai para o `MultiChainTxRegistry` |
 | [test/](test/) | Testes automatizados, um arquivo por contrato |
 | [tasks/deploy.ts](tasks/deploy.ts) | Tarefa `deploy`: publicação, verificação e relayers dos três contratos |
-| [scripts/deploy-cre-receiver.ts](scripts/deploy-cre-receiver.ts) | Publica o `MultiChainTxReceiver` e mantém o forwarder dele igual ao do `project.config.json` |
+| [scripts/deploy-cre-receiver.ts](scripts/deploy-cre-receiver.ts) | Publica o `MultiChainTxReceiver` e mantém o forwarder dele igual ao do `project.config.<ambiente>.json` |
 | [scripts/deploy-and-setup-all.ts](scripts/deploy-and-setup-all.ts) | Roda todos os passos de publicação em sequência: compilar, deploy, redes, stablecoins e receptor do CRE |
 | [scripts/register-chains.ts](scripts/register-chains.ts) | Registro das redes rastreadas e das chaves de schema de cada rede |
 | [scripts/register-stablecoins.ts](scripts/register-stablecoins.ts) | Registro dos stablecoins no `FundRegistry` |
 | [scripts/lib/chains.ts](scripts/lib/chains.ts) | Lista das redes rastreadas e das chaves de schema de cada rede, usada pelos scripts e pelos testes |
 | [scripts/lib/check-env.ts](scripts/lib/check-env.ts) | Checagem da chave privada, usada pelos scripts |
 | [scripts/lib/send-tx.ts](scripts/lib/send-tx.ts) | Envio de transação com nova tentativa quando o nó acusa uma transação pendente da conta |
-| [project-config.ts](project-config.ts) | Lê o `project.config.json` da raiz e expõe a configuração tipada para o Hardhat e os scripts |
-| [../project.config.json](../project.config.json) | Configuração pública, na raiz do repositório |
+| [project-config.ts](project-config.ts) | Lê e grava o `project.config.<ambiente>.json` da raiz e diz qual ambiente cada rede usa |
+| [../project.config.staging.json](../project.config.staging.json) e [../project.config.production.json](../project.config.production.json) | Configuração pública de cada ambiente, na raiz do repositório |
 | `../.env` | Segredos, na raiz do repositório. Não é commitado |
 | `../project.backup.config.json` | Histórico dos endereços substituídos por `--only` ou `--force`. Criado pela tarefa `deploy` na primeira substituição |
 | [hardhat.config.ts](hardhat.config.ts) | Compilador, rede e verificação |
@@ -675,7 +698,9 @@ A função existe para quem tem poucas chamadas disponíveis, como o [workflow d
 
 Os quatro contratos têm testes automatizados (`npm test`): `MultiChainTxRegistry`, `FundRegistry`, `OrderRegistry` e `MultiChainTxReceiver`.
 
-Os quatro estão publicados na Ethereum Sepolia, nos endereços do [project.config.json](../project.config.json). As redes, as chaves de schema e os stablecoins estão registrados. O receptor usa o forwarder de simulação do Chainlink CRE.
+No ambiente staging, os quatro estão publicados na Ethereum Sepolia, nos endereços do [project.config.staging.json](../project.config.staging.json). As redes, as chaves de schema e os stablecoins estão registrados. O receptor usa o forwarder de simulação do Chainlink CRE.
+
+No ambiente production, nada foi publicado ainda: os endereços do [project.config.production.json](../project.config.production.json) estão vazios.
 
 Ainda não há fundos, ordens nem transações registrados: essa carga é feita pelo [workflow do Chainlink CRE](../workflow-registry/README.md), que ainda não foi executado com `--broadcast`.
 
@@ -690,17 +715,17 @@ A raiz do repositório tem atalhos com `npm run`, mas no PowerShell eles perdem 
 No **bash** (Git Bash, Linux, macOS), o `--` vai sem aspas:
 
 ```sh
-npm run contracts:deploy -- --network sepolia
-npm run contracts:deploy -- --network sepolia --only order-registry --yes
-npm run contracts:deploy -- --network sepolia --force --yes
+npm run contracts:deploy -- --network staging
+npm run contracts:deploy -- --network staging --only order-registry --yes
+npm run contracts:deploy -- --network staging --force --yes
 ```
 
 No **PowerShell**, o `--` precisa ir entre aspas simples, assim: `'--'`.
 
 ```powershell
-npm run contracts:deploy '--' --network sepolia
-npm run contracts:deploy '--' --network sepolia --only order-registry --yes
-npm run contracts:deploy '--' --network sepolia --force --yes
+npm run contracts:deploy '--' --network staging
+npm run contracts:deploy '--' --network staging --only order-registry --yes
+npm run contracts:deploy '--' --network staging --force --yes
 ```
 
 **O que acontece no PowerShell sem as aspas.** O PowerShell descarta o `--`, o `npm` fica com as opções para si e o deploy roda sem nenhuma delas. O comando não dá erro: ele roda na rede simulada, como se você não tivesse passado nada. Dá para reconhecer pela saída:
@@ -710,7 +735,7 @@ PS> npm run contracts:deploy -- --only order-registry --yes
 npm warn invalid config only="order-registry" set in command line options
 
 > hardhat deploy                              <- as opções sumiram
-Network: default | deployer: 0xf39F...        <- rede simulada, não a sepolia
+Network: default | deployer: 0xf39F...        <- rede simulada, não a staging
 ```
 
 Com as aspas, a mesma linha mostra as opções chegando ao deploy:
@@ -723,7 +748,7 @@ PS> npm run contracts:deploy '--' --only order-registry --yes
 
 Antes de confiar em um deploy feito com `npm run`, confira essas duas linhas: a que começa com `> hardhat deploy` deve trazer as suas opções, e a linha `Network:` deve mostrar a rede que você pediu. Por causa dessa falha silenciosa, prefira o jeito recomendado, que não tem o `--`.
 
-O mesmo vale para qualquer atalho da raiz que receba opções, como `npm run contracts:register-chains '--' --network sepolia`.
+O mesmo vale para qualquer atalho da raiz que receba opções, como `npm run contracts:register-chains '--' --network staging`.
 
 ### Erro com conta delegada: in-flight transaction limit
 

@@ -1,5 +1,5 @@
 import { network } from "hardhat";
-import { projectConfig } from "../project-config.js";
+import { environmentOf, loadProjectConfig, projectConfigFile } from "../project-config.js";
 import { assertPrivateKey } from "./lib/check-env.js";
 import { CHAINS, SCHEMA_KEYS_BY_NETWORK } from "./lib/chains.js";
 import { sendTx } from "./lib/send-tx.js";
@@ -9,13 +9,18 @@ const SCHEMA_KEYS = SCHEMA_KEYS_BY_NETWORK.flatMap(({ network, keys }) =>
 );
 
 const { ethers, networkName, networkConfig } = await network.create();
+const environment = environmentOf(networkName);
+const configFile = projectConfigFile(environment);
+const projectConfig = loadProjectConfig(environment);
 assertPrivateKey(networkConfig);
 
 const [signer] = await ethers.getSigners();
 console.log(`Network: ${networkName} | signer: ${signer.address}`);
+if (networkConfig.type !== "edr-simulated") console.log(`Addresses: ${configFile}`);
 
 // On the local simulated network the script deploys a fresh contract, so it can be tested.
-// Elsewhere it uses the deployed contract at multiChainTxRegistryAddress (project.config.json, at the repository root).
+// Elsewhere it uses the deployed contract at multiChainTxRegistryAddress, in the
+// project.config.<environment>.json of the network (staging or production), at the repository root.
 let registry;
 
 if (networkConfig.type === "edr-simulated") {
@@ -24,7 +29,7 @@ if (networkConfig.type === "edr-simulated") {
 } else if (projectConfig.multiChainTxRegistryAddress !== "") {
   registry = await ethers.getContractAt("MultiChainTxRegistry", projectConfig.multiChainTxRegistryAddress);
 } else {
-  throw new Error("Set multiChainTxRegistryAddress in project.config.json (repository root)");
+  throw new Error(`Set multiChainTxRegistryAddress in ${configFile} (repository root)`);
 }
 
 console.log(`MultiChainTxRegistry: ${await registry.getAddress()}`);

@@ -16,7 +16,7 @@ import { fundRegistryAbi } from "../abi/FundRegistry";
 import { multiChainTxReceiverAbi } from "../abi/MultiChainTxReceiver";
 import { multiChainTxRegistryAbi } from "../abi/MultiChainTxRegistry";
 import { orderRegistryAbi } from "../abi/OrderRegistry";
-import { CONTRACTS, CUSTOM_RPC, RPC_URL } from "../config";
+import { CONTRACTS, CUSTOM_RPC, ENVIRONMENT, RPC_URL } from "../config";
 
 // On Sepolia, calls made together are grouped in one request (Multicall3). Another node,
 // such as a local one, may not have that contract: there each call goes on its own.
@@ -27,7 +27,7 @@ export const client = createPublicClient({
 });
 
 const required = (address: Address | null, name: string): Address => {
-  if (!address) throw new Error(`${name} is not deployed: its address is empty in project.config.json`);
+  if (!address) throw new Error(`${name} is not deployed: its address is empty in project.config.${ENVIRONMENT}.json`);
   return address;
 };
 

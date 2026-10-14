@@ -19,8 +19,11 @@
     "workflow:simulate": "cre workflow simulate workflow-registry --target local-simulation --non-interactive --trigger-index 0",
     "frontend:install": "npm install --prefix ./frontend",
     "frontend:dev": "npm run dev --prefix ./frontend",
+    "frontend:dev:production": "npm run dev:production --prefix ./frontend",
     "frontend:build": "npm run build --prefix ./frontend",
+    "frontend:build:production": "npm run build:production --prefix ./frontend",
     "frontend:preview": "npm run preview --prefix ./frontend",
+    "frontend:preview:production": "npm run preview:production --prefix ./frontend",
     "frontend:sync-abi": "npm run sync-abi --prefix ./frontend"
   }
 }

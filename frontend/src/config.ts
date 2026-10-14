@@ -1,13 +1,24 @@
 // Everything the pages need to know about the deployment. Nothing is typed twice:
 // the values come from the files the other parts of the repository already keep.
 import type { Address } from "viem";
-import projectConfig from "../../project.config.json";
-import workflowConfig from "../../workflow-registry/config/config.staging.json";
+import productionProject from "../../project.config.production.json";
+import stagingProject from "../../project.config.staging.json";
+import productionWorkflow from "../../workflow-registry/config/config.production.json";
+import stagingWorkflow from "../../workflow-registry/config/config.staging.json";
+
+const env: Record<string, string | undefined> = import.meta.env ?? {};
+
+/// Environment of the deployment the app reads, chosen with `vite --mode staging` or
+/// `--mode production` (see package.json). Each one has its own contracts on Ethereum
+/// Sepolia, in project.config.<environment>.json.
+export const ENVIRONMENT: "staging" | "production" = import.meta.env.MODE === "production" ? "production" : "staging";
+
+const projectConfig = ENVIRONMENT === "production" ? productionProject : stagingProject;
+const workflowConfig = ENVIRONMENT === "production" ? productionWorkflow : stagingWorkflow;
 
 // For development against another deployment, such as a local Hardhat node, each value
 // can be replaced in frontend/.env.local (see .env.example). Without it, the values of
-// project.config.json are used.
-const env: Record<string, string | undefined> = import.meta.env ?? {};
+// project.config.<environment>.json are used.
 
 /// True when the app was pointed to another node: it may not be Ethereum Sepolia.
 export const CUSTOM_RPC = Boolean(env.VITE_RPC_URL);

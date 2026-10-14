@@ -1,8 +1,9 @@
 import hardhatToolboxMochaEthers from "@nomicfoundation/hardhat-toolbox-mocha-ethers";
 import { configVariable, defineConfig, task } from "hardhat/config";
+import type { HttpNetworkUserConfig } from "hardhat/types/config";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { projectConfig, repoRootUrl } from "./project-config.js";
+import { loadProjectConfig, repoRootUrl, type Environment } from "./project-config.js";
 
 // Loads the secrets from the .env at the repository root (see .env.example)
 const envPath = fileURLToPath(new URL(".env", repoRootUrl));
@@ -20,7 +21,7 @@ const deployTask = task("deploy", "Deploy MultiChainTxRegistry, FundRegistry and
   })
   .addFlag({
     name: "force",
-    description: "Deploy the three contracts again, ignoring the addresses in project.config.json",
+    description: "Deploy the three contracts again, ignoring the addresses in project.config.<network>.json",
   })
   .addFlag({
     name: "yes",
@@ -28,6 +29,15 @@ const deployTask = task("deploy", "Deploy MultiChainTxRegistry, FundRegistry and
   })
   .setAction(() => import("./tasks/deploy.js"))
   .build();
+
+// One network per environment, both on Ethereum Sepolia. Each one reads and writes the
+// addresses of its own project.config.<environment>.json: --network staging or --network production
+const sepoliaNetwork = (environment: Environment): HttpNetworkUserConfig => ({
+  type: "http",
+  chainType: "l1",
+  url: loadProjectConfig(environment).rpcUrl,
+  accounts: [configVariable("ETH_PRIVATE_KEY")],
+});
 
 export default defineConfig({
   plugins: [hardhatToolboxMochaEthers],
@@ -39,12 +49,8 @@ export default defineConfig({
     },
   },
   networks: {
-    sepolia: {
-      type: "http",
-      chainType: "l1",
-      url: projectConfig.rpcUrl,
-      accounts: [configVariable("ETH_PRIVATE_KEY")],
-    },
+    staging: sepoliaNetwork("staging"),
+    production: sepoliaNetwork("production"),
   },
   verify: {
     etherscan: {

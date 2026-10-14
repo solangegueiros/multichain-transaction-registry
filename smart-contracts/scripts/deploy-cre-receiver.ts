@@ -1,11 +1,12 @@
 import hre from "hardhat";
 import { verifyContract } from "@nomicfoundation/hardhat-verify/verify";
 import { assertPrivateKey } from "./lib/check-env.js";
-import { projectConfig, saveProjectConfig } from "../project-config.js";
+import { environmentOf, loadProjectConfig, projectConfigFile, saveProjectConfig } from "../project-config.js";
 import { sendTx } from "./lib/send-tx.js";
 
 // Deploys MultiChainTxReceiver, the entry point of Chainlink CRE workflows, and keeps
-// its configuration in line with project.config.json (repository root): the forwarder,
+// its configuration in line with project.config.<environment>.json (repository root,
+// the environment is the name of the network: staging or production): the forwarder,
 // the OrderRegistry and the FundRegistry it writes to, and the roles it needs in them.
 //
 // Run it after the `deploy` task: the receiver needs the MultiChainTxRegistry, and it
@@ -22,7 +23,7 @@ import { sendTx } from "./lib/send-tx.js";
 //   creForwarderAddress filled  a new receiver is deployed with it, and an existing
 //                               receiver is updated to it (setForwarderAddress).
 //
-// The receiver is pointed to the OrderRegistry and the FundRegistry of project.config.json,
+// The receiver is pointed to the OrderRegistry and the FundRegistry of that file,
 // and receives OPERATOR_ROLE in both and RELAYER_ROLE in MultiChainTxRegistry. Each of these
 // is done only when the account that runs the script is an admin of the contract involved;
 // otherwise the script lists what an admin still has to do.
@@ -52,16 +53,20 @@ const { ethers, networkName, networkConfig } = await hre.network.create();
 assertPrivateKey(networkConfig);
 
 const isLocal = networkConfig.type === "edr-simulated";
+const environment = environmentOf(networkName);
+const configFile = projectConfigFile(environment);
+const projectConfig = loadProjectConfig(environment);
 
 const [deployer] = await ethers.getSigners();
 console.log(`Network: ${networkName} | deployer: ${deployer.address}`);
+if (!isLocal) console.log(`Addresses: ${configFile}`);
 console.log(`CRE chain name: ${CRE_CHAIN_NAME}\n`);
 
 const forwarderIsConfigured = projectConfig.creForwarderAddress !== "";
 const wantedForwarder = forwarderIsConfigured ? projectConfig.creForwarderAddress : MOCK_FORWARDER;
 
 if (!ethers.isAddress(wantedForwarder)) {
-  throw new Error(`creForwarderAddress in project.config.json is not an address: ${wantedForwarder}`);
+  throw new Error(`creForwarderAddress in ${configFile} is not an address: ${wantedForwarder}`);
 }
 
 // ---------------------------------------------------------------- MultiChainTxRegistry
@@ -88,7 +93,7 @@ if (isLocal) {
 } else if (projectConfig.multiChainTxRegistryAddress !== "") {
   txRegistry = await ethers.getContractAt("MultiChainTxRegistry", projectConfig.multiChainTxRegistryAddress);
 } else {
-  throw new Error("multiChainTxRegistryAddress is empty in project.config.json (repository root). Deploy the contracts first: npx hardhat deploy");
+  throw new Error(`multiChainTxRegistryAddress is empty in ${configFile} (repository root). Deploy the contracts first: npx hardhat deploy --network ${networkName}`);
 }
 
 const txRegistryAddress = await txRegistry.getAddress();
@@ -101,7 +106,7 @@ let receiver;
 
 if (existing !== "") {
   if ((await ethers.provider.getCode(existing)) === "0x") {
-    throw new Error(`multiChainTxReceiverAddress in project.config.json is ${existing}, but there is no contract at this address on ${networkName}`);
+    throw new Error(`multiChainTxReceiverAddress in ${configFile} is ${existing}, but there is no contract at this address on ${networkName}`);
   }
 
   receiver = await ethers.getContractAt("MultiChainTxReceiver", existing);
@@ -111,7 +116,7 @@ if (existing !== "") {
   if (!same(bound, txRegistryAddress)) {
     throw new Error(
       `MultiChainTxReceiver ${existing} writes to MultiChainTxRegistry ${bound}, not to ${txRegistryAddress}. ` +
-        "Clear multiChainTxReceiverAddress in project.config.json and run again to deploy a new receiver.",
+        `Clear multiChainTxReceiverAddress in ${configFile} and run again to deploy a new receiver.`,
     );
   }
 
@@ -129,8 +134,8 @@ if (existing !== "") {
 
   if (!isLocal) {
     // Saved right away: if a later step fails, the receiver is not deployed twice
-    saveProjectConfig({ ...projectConfig, multiChainTxReceiverAddress: address });
-    console.log("  saved as multiChainTxReceiverAddress in project.config.json");
+    saveProjectConfig(environment, { ...projectConfig, multiChainTxReceiverAddress: address });
+    console.log(`  saved as multiChainTxReceiverAddress in ${configFile}`);
 
     console.log(`  waiting for ${VERIFY_CONFIRMATIONS} confirmations before verifying on Etherscan...`);
     await deployTx?.wait(VERIFY_CONFIRMATIONS);
@@ -160,7 +165,7 @@ if (same(currentForwarder, wantedForwarder)) {
 } else if (!forwarderIsConfigured) {
   // An empty creForwarderAddress never changes a receiver that is already deployed:
   // it must not put a production receiver back on the simulation forwarder.
-  console.log("\ncreForwarderAddress is empty in project.config.json: the forwarder of the receiver was left as it is.");
+  console.log(`\ncreForwarderAddress is empty in ${configFile}: the forwarder of the receiver was left as it is.`);
 } else if (deployerIsReceiverAdmin) {
   const tx = await sendTx(() => receiver.setForwarderAddress(wantedForwarder));
   console.log(`\nForwarder changed from ${currentForwarder} to ${wantedForwarder}, tx ${tx.hash}`);
@@ -202,7 +207,7 @@ for (const target of targets) {
   if (target.wanted === "") {
     // Nothing to point to yet. A registry already set in the receiver is left as it is.
     if (current === ethers.ZeroAddress) {
-      console.log(`${target.name}: not set. ${target.configKey} is empty in project.config.json: deploy the contracts and run this script again.`);
+      console.log(`${target.name}: not set. ${target.configKey} is empty in ${configFile}: deploy the contracts and run this script again.`);
       linked.push(`${target.name}: not set`);
       continue;
     }
@@ -275,7 +280,7 @@ if (same(currentForwarder, MOCK_FORWARDER)) {
   console.log("\nThis receiver trusts the MockKeystoneForwarder: use it only to simulate workflows");
   console.log("(cre workflow simulate --broadcast). Keep the workflow restriction off while simulating:");
   console.log("the mock forwarder sends no workflow identity. Before deploying a workflow, set");
-  console.log(`creForwarderAddress to ${PRODUCTION_FORWARDER} in project.config.json and run this script again.`);
+  console.log(`creForwarderAddress to ${PRODUCTION_FORWARDER} in ${configFile} and run this script again.`);
 } else if (!restricted) {
   console.log("\nNo workflow restriction is set: ANY workflow of ANY owner can deliver reports to this");
   console.log("receiver. An admin should call setExpectedWorkflowId or setExpectedAuthor.");

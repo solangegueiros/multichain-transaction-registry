@@ -3,7 +3,9 @@ import { verifyContract } from "@nomicfoundation/hardhat-verify/verify";
 import { assertPrivateKey } from "../scripts/lib/check-env.js";
 import {
   appendConfigBackup,
-  projectConfig,
+  environmentOf,
+  loadProjectConfig,
+  projectConfigFile,
   saveProjectConfig,
   type AddressKey,
   type ProjectConfig,
@@ -17,17 +19,20 @@ import { sendTx } from "../scripts/lib/send-tx.js";
 // MultiChainTxReceiver, the entry point of Chainlink CRE workflows, is deployed apart,
 // by scripts/deploy-cre-receiver.ts.
 //
-//   no option   deploys only the contracts whose address is empty in project.config.json
-//               (repository root) and reuses the others
+// The addresses are read from and saved to project.config.<environment>.json (repository
+// root), where the environment is the name of the network: staging or production.
+//
+//   no option   deploys only the contracts whose address is empty in that file and
+//               reuses the others
 //   --only X    deploys X again, plus the contracts that depend on it
 //   --force     deploys the three again, ignoring the addresses already filled
 //   --yes       confirms replacing contracts that are already deployed (real networks only)
 //
-// Each new address is saved to project.config.json as soon as the contract is deployed.
+// Each new address is saved to the file as soon as the contract is deployed.
 // Before a deployed contract is replaced, the current file is appended to
 // project.backup.config.json, so the old addresses are not lost.
 //
-// On the local simulated network the addresses of project.config.json are ignored
+// On the local simulated network the addresses of the file are ignored
 // (they belong to the real network), every contract is deployed fresh and nothing is saved.
 
 interface DeployArguments {
@@ -41,7 +46,7 @@ interface ContractInfo {
   name: string;
   /// Value accepted by --only
   option: string;
-  /// Field of project.config.json that holds the address
+  /// Field of project.config.<environment>.json that holds the address
   key: AddressKey;
   /// Contracts received in the constructor, in order. A contract is bound for life
   /// to the ones it was deployed with, so replacing a dependency replaces it too.
@@ -104,13 +109,17 @@ export default async function deploy(args: DeployArguments, hre: HardhatRuntimeE
   assertPrivateKey(networkConfig);
 
   const isLocal = networkConfig.type === "edr-simulated";
+  const environment = environmentOf(networkName);
+  const configFile = projectConfigFile(environment);
+  const projectConfig = loadProjectConfig(environment);
 
   const [deployer] = await ethers.getSigners();
   const balance = await ethers.provider.getBalance(deployer.address);
   console.log(`Network: ${networkName} | deployer: ${deployer.address}`);
+  if (!isLocal) console.log(`Addresses: ${configFile}`);
   console.log(`Balance: ${ethers.formatEther(balance)} ETH\n`);
 
-  // On the local network nothing is deployed yet, whatever project.config.json says
+  // On the local network nothing is deployed yet, whatever the file says
   const before: ProjectConfig = isLocal
     ? { ...projectConfig, multiChainTxRegistryAddress: "", fundRegistryAddress: "", orderRegistryAddress: "" }
     : { ...projectConfig };
@@ -137,7 +146,7 @@ export default async function deploy(args: DeployArguments, hre: HardhatRuntimeE
     if (toDeploy.has(contract.key) && before[contract.key] !== "" && !requestedWithDependents.has(contract.key)) {
       const emptyDependency = contract.dependsOn.find((dependency) => toDeploy.has(dependency));
       throw new Error(
-        `${contract.key} is filled in project.config.json, but ${emptyDependency} is empty. ` +
+        `${contract.key} is filled in ${configFile}, but ${emptyDependency} is empty. ` +
           `The contract at ${contract.key} is bound to another ${emptyDependency}: ` +
           `clear ${contract.key} too, or use --only / --force to deploy it again.`,
       );
@@ -164,7 +173,7 @@ export default async function deploy(args: DeployArguments, hre: HardhatRuntimeE
   if (replaced.length !== 0) {
     console.log(
       "A contract that is deployed again starts empty, at a new address. The contract it replaces " +
-        "stays on-chain with its data, but is no longer referenced by project.config.json.",
+        `stays on-chain with its data, but is no longer referenced by ${configFile}.`,
     );
 
     if (!args.yes) {
@@ -189,7 +198,7 @@ export default async function deploy(args: DeployArguments, hre: HardhatRuntimeE
     if (!toDeploy.has(contract.key)) {
       if ((await ethers.provider.getCode(config[contract.key])) === "0x") {
         throw new Error(
-          `${contract.key} in project.config.json is ${config[contract.key]}, but there is no contract at this address on ${networkName}`,
+          `${contract.key} in ${configFile} is ${config[contract.key]}, but there is no contract at this address on ${networkName}`,
         );
       }
       console.log(`${contract.name}: ${config[contract.key]} (reused)`);
@@ -210,8 +219,8 @@ export default async function deploy(args: DeployArguments, hre: HardhatRuntimeE
     if (isLocal) continue;
 
     // Saved right away: if a later step fails, this contract is not deployed twice
-    saveProjectConfig(config);
-    console.log(`  saved as ${contract.key} in project.config.json`);
+    saveProjectConfig(environment, config);
+    console.log(`  saved as ${contract.key} in ${configFile}`);
 
     console.log(`  waiting for ${VERIFY_CONFIRMATIONS} confirmations before verifying on Etherscan...`);
     await deployTx?.wait(VERIFY_CONFIRMATIONS);
@@ -241,7 +250,7 @@ export default async function deploy(args: DeployArguments, hre: HardhatRuntimeE
     if (actual.toLowerCase() !== expected.toLowerCase()) {
       throw new Error(
         `${what} is ${actual}, expected ${expected}. ` +
-          "The addresses in project.config.json do not belong to the same deployment: " +
+          `The addresses in ${configFile} do not belong to the same deployment: ` +
           "use --only on the contract that must be deployed again.",
       );
     }
@@ -308,7 +317,7 @@ export default async function deploy(args: DeployArguments, hre: HardhatRuntimeE
   // MultiChainTxRegistry it was deployed with
   if (!isLocal && projectConfig.multiChainTxReceiverAddress !== "" && toDeploy.has("multiChainTxRegistryAddress")) {
     console.log(`\nMultiChainTxReceiver ${projectConfig.multiChainTxReceiverAddress} is bound to the MultiChainTxRegistry that was`);
-    console.log("replaced. Clear multiChainTxReceiverAddress in project.config.json and deploy it again:");
+    console.log(`replaced. Clear multiChainTxReceiverAddress in ${configFile} and deploy it again:`);
     console.log("  npx hardhat run scripts/deploy-cre-receiver.ts --network " + networkName);
   }
 

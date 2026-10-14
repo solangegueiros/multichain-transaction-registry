@@ -1,5 +1,5 @@
 import { network } from "hardhat";
-import { projectConfig } from "../project-config.js";
+import { environmentOf, loadProjectConfig, projectConfigFile } from "../project-config.js";
 import { assertPrivateKey } from "./lib/check-env.js";
 import { CHAINS } from "./lib/chains.js";
 import { sendTx } from "./lib/send-tx.js";
@@ -37,16 +37,21 @@ const STABLECOINS = [
 ];
 
 const { ethers, networkName, networkConfig } = await network.create();
+const environment = environmentOf(networkName);
+const configFile = projectConfigFile(environment);
+const projectConfig = loadProjectConfig(environment);
 assertPrivateKey(networkConfig);
 
 const isLocal = networkConfig.type === "edr-simulated";
 
 const [signer] = await ethers.getSigners();
 console.log(`Network: ${networkName} | signer: ${signer.address}`);
+if (networkConfig.type !== "edr-simulated") console.log(`Addresses: ${configFile}`);
 
 // On the local simulated network the script deploys fresh contracts and registers the
 // chains, so it can be tested. Elsewhere it uses the deployed FundRegistry at
-// fundRegistryAddress (project.config.json, at the repository root).
+// fundRegistryAddress, in the project.config.<environment>.json of the network (staging or
+// production), at the repository root.
 let fundRegistry;
 
 if (isLocal) {
@@ -61,7 +66,7 @@ if (isLocal) {
 } else if (projectConfig.fundRegistryAddress !== "") {
   fundRegistry = await ethers.getContractAt("FundRegistry", projectConfig.fundRegistryAddress);
 } else {
-  throw new Error("fundRegistryAddress is empty in project.config.json (repository root). Deploy the contracts first: npx hardhat deploy");
+  throw new Error(`fundRegistryAddress is empty in ${configFile} (repository root). Deploy the contracts first: npx hardhat deploy --network ${networkName}`);
 }
 
 const txRegistry = await ethers.getContractAt("MultiChainTxRegistry", await fundRegistry.txRegistry());

@@ -4,9 +4,12 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc --noEmit && vite build",
-    "preview": "vite preview",
+    "dev": "vite --mode staging",
+    "dev:production": "vite --mode production",
+    "build": "tsc --noEmit && vite build --mode staging",
+    "build:production": "tsc --noEmit && vite build --mode production",
+    "preview": "vite preview --mode staging",
+    "preview:production": "vite preview --mode production",
     "typecheck": "tsc --noEmit",
     "sync-abi": "node scripts/sync-abi.mjs"
   },
