@@ -8,10 +8,42 @@ import stagingWorkflow from "../../workflow-registry/config/config.staging.json"
 
 const env: Record<string, string | undefined> = import.meta.env ?? {};
 
-/// Environment of the deployment the app reads, chosen with `vite --mode staging` or
-/// `--mode production` (see package.json). Each one has its own contracts on Ethereum
-/// Sepolia, in project.config.<environment>.json.
-export const ENVIRONMENT: "staging" | "production" = import.meta.env.MODE === "production" ? "production" : "staging";
+/// Each environment has its own contracts on Ethereum Sepolia, in
+/// project.config.<environment>.json. The app carries both and reads one at a time.
+export type Environment = "staging" | "production";
+
+const ENVIRONMENT_KEY = "environment";
+const isEnvironment = (value: string | null): value is Environment => value === "staging" || value === "production";
+
+/// Environment chosen in the footer of the menu. The address (?env=production) comes
+/// first, so a shared link opens the same environment; then the last choice made in
+/// this browser; then staging.
+function chosenEnvironment(): Environment {
+  const fromUrl = new URLSearchParams(window.location.search).get("env");
+  if (isEnvironment(fromUrl)) return fromUrl;
+  try {
+    const saved = localStorage.getItem(ENVIRONMENT_KEY);
+    if (isEnvironment(saved)) return saved;
+  } catch {
+    // no storage: staging
+  }
+  return "staging";
+}
+
+export const ENVIRONMENT: Environment = chosenEnvironment();
+
+/// Opens the app again on the other environment. Every address and every cached read
+/// belongs to one environment, so the page is loaded from scratch.
+export function switchEnvironment(environment: Environment): void {
+  try {
+    localStorage.setItem(ENVIRONMENT_KEY, environment);
+  } catch {
+    // no storage: the address alone keeps the choice
+  }
+  const url = new URL(window.location.href);
+  url.searchParams.set("env", environment);
+  window.location.assign(url.toString());
+}
 
 const projectConfig = ENVIRONMENT === "production" ? productionProject : stagingProject;
 const workflowConfig = ENVIRONMENT === "production" ? productionWorkflow : stagingWorkflow;
@@ -51,9 +83,9 @@ export const FORWARDERS: Record<string, string> = {
   "0xf8344cfd5c43616a4366c34e3eee75af79a74482": "produção (KeystoneForwarder)",
 };
 
-/// Observer API: the same client id the workflow uses. Requests go through the proxy
-/// of vite.config.ts.
+/// Observer API: the same client id the workflow of the environment uses. Requests go
+/// through the proxy of the environment, in vite.config.ts.
 export const OBSERVER = {
-  proxyPath: "/observer-api",
+  proxyPath: `/observer-api/${ENVIRONMENT}`,
   clientId: workflowConfig.apiClientId,
 };

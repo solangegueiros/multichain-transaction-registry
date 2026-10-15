@@ -51,25 +51,31 @@ Da raiz do repositório:
 npm run frontend:dev
 ```
 
-O painel abre em `http://localhost:5173`, lendo os contratos de staging. Para gerar e servir o pacote:
+Abrir [http://localhost:5173](http://localhost:5173)
+
+O painel abre lendo os contratos de staging. 
+
+### Ambiente
+
+O painel lê um ambiente de cada vez: staging ou production. Um botão no rodapé do menu lateral troca entre os dois. O pacote leva os endereços dos dois ambientes.
+
+- **Trocar recarrega a página.** Todos os endereços e todas as leituras em cache são de um ambiente só, então o painel abre de novo do zero no outro.
+- **O endereço guarda o ambiente.** A troca acrescenta `?env=production` ou `?env=staging` ao endereço da página, e um link copiado abre no mesmo ambiente.
+- **O navegador lembra a última escolha.** Sem `?env=` no endereço, vale a última escolha feita neste navegador. Na primeira visita, staging.
+- **Em tela estreita, o botão sobe para o topo.** O menu vira uma barra no alto da página e o rodapé dele some; o botão aparece ao lado do logo.
+
+### Publicar
+
+O painel é um site estático. Gere os arquivos e confira o resultado na sua máquina antes de hospedar:
 
 ```bash
 npm run frontend:build
 npm run frontend:preview
 ```
 
-O `build` confere os tipos antes de empacotar. O resultado fica em `frontend/dist/staging/`.
+O `build` confere os tipos e gera o site em `frontend/dist/`. O `preview` serve essa pasta em [http://localhost:4173](http://localhost:4173), do jeito que ela vai ficar publicada.
 
-### Ambiente
-
-O painel lê um ambiente de cada vez: staging ou production. Cada comando tem a versão de production, com `:production` no fim:
-
-| Ambiente | Abrir | Empacotar | Servir o pacote |
-|---|---|---|---|
-| staging | `npm run frontend:dev` | `npm run frontend:build`, em `frontend/dist/staging/` | `npm run frontend:preview` |
-| production | `npm run frontend:dev:production` | `npm run frontend:build:production`, em `frontend/dist/production/` | `npm run frontend:preview:production` |
-
-O ambiente aparece no rodapé do menu lateral, ao lado da rede. Por baixo, cada comando passa `--mode staging` ou `--mode production` para o Vite. Um pacote só tem os endereços do seu ambiente.
+Para publicar, hospede o conteúdo de `frontend/dist/` em qualquer servidor de arquivos estáticos. A página de Sincronização precisa também de um repasse para a Observer API, explicado em [Chave da Observer API](#chave-da-observer-api).
 
 ## De onde vêm os dados
 
@@ -100,7 +106,7 @@ Só a página de sincronização usa a Observer API, e ela pede a chave na tela.
 
 Sem a chave, as outras páginas funcionam normalmente.
 
-**A Observer API precisa de um proxy.** A API não aceita os cabeçalhos `X-Observer-Id` e `X-Observer-Key` em chamadas feitas direto de um navegador. Por isso o painel chama o caminho `/observer-api`, e o servidor repassa a chamada. O `npm run frontend:dev` e o `npm run frontend:preview` já fazem esse repasse, configurado em [vite.config.ts](vite.config.ts). Em uma hospedagem de arquivos estáticos, a página de sincronização só funciona se o servidor tiver uma regra equivalente. As outras páginas não dependem disso.
+**A Observer API precisa de um proxy.** A API não aceita os cabeçalhos `X-Observer-Id` e `X-Observer-Key` em chamadas feitas direto de um navegador. Por isso o painel chama o caminho `/observer-api/<ambiente>`, e o servidor repassa a chamada à API configurada no workflow do mesmo ambiente. O `npm run frontend:dev` e o `npm run frontend:preview` já fazem esse repasse, configurado em [vite.config.ts](vite.config.ts). Em uma hospedagem de arquivos estáticos, a página de sincronização só funciona se o servidor tiver uma regra equivalente. As outras páginas não dependem disso.
 
 ## Identidade visual
 
@@ -139,7 +145,7 @@ O logo e o ícone são cópias dos arquivos do site de referência e ficam em [p
 | [scripts/sync-abi.mjs](scripts/sync-abi.mjs) | Gera as ABIs a partir dos artifacts do Hardhat |
 | [src/styles.css](src/styles.css) | Cores, fontes e layout |
 | [public/](public/) | Logo e ícone |
-| [vite.config.ts](vite.config.ts) | Empacotamento, uma pasta por ambiente, e o proxy da Observer API |
+| [vite.config.ts](vite.config.ts) | Empacotamento e o proxy da Observer API de cada ambiente |
 
 ## Atualizar as ABIs
 

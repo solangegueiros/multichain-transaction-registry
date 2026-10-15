@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { NavLink, Route, Routes } from "react-router-dom";
-import { CUSTOM_RPC, ENVIRONMENT } from "./config";
+import { CUSTOM_RPC, ENVIRONMENT, switchEnvironment, type Environment } from "./config";
 import FundPage from "./pages/FundPage";
 import FundsPage from "./pages/FundsPage";
 import OrderPage from "./pages/OrderPage";
@@ -83,6 +83,8 @@ export default function App() {
             <img src="/brand/abtoken.png" alt="ABToken" width="418" height="278" />
           </NavLink>
           <span>atestação multichain do piloto GTT</span>
+          {/* the footer of the menu is hidden on narrow screens: the toggle comes up here */}
+          <EnvironmentToggle className="env-toggle-top" />
         </div>
 
         <div className="nav-groups">
@@ -104,7 +106,7 @@ export default function App() {
           <div className="foot-title">MultiChainTxRegistry</div>
           <div className="foot-sub">somente leitura</div>
           <span className="foot-chip">{CUSTOM_RPC ? "rede personalizada" : "Ethereum Sepolia"}</span>
-          <span className="foot-chip">{ENVIRONMENT === "production" ? "produção" : "staging"}</span>
+          <EnvironmentToggle />
         </div>
       </nav>
 
@@ -120,6 +122,29 @@ export default function App() {
           <Route path="*" element={<p className="empty">Página não encontrada.</p>} />
         </Routes>
       </main>
+    </div>
+  );
+}
+
+const ENVIRONMENT_LABELS: [Environment, string][] = [
+  ["staging", "staging"],
+  ["production", "produção"],
+];
+
+/// Chooses the environment the panel reads. Switching reloads the page.
+function EnvironmentToggle({ className = "" }: { className?: string }) {
+  return (
+    <div className={`env-toggle ${className}`} role="group" aria-label="Ambiente">
+      {ENVIRONMENT_LABELS.map(([environment, label]) => (
+        <button
+          key={environment}
+          type="button"
+          aria-pressed={environment === ENVIRONMENT}
+          onClick={() => environment !== ENVIRONMENT && switchEnvironment(environment)}
+        >
+          {label}
+        </button>
+      ))}
     </div>
   );
 }

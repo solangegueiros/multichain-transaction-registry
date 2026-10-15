@@ -20,6 +20,10 @@ export interface ProjectConfig {
   creForwarderAddress: string;
   /// Deployed MultiChainTxReceiver ("" until it is deployed)
   multiChainTxReceiverAddress: string;
+  /// Id of the deployed Chainlink CRE workflow, shown by `cre workflow deploy`. When
+  /// filled, the receiver accepts reports of this workflow only (setExpectedWorkflowId).
+  /// "" = the restriction of the receiver is left as it is (see scripts/deploy-cre-receiver.ts).
+  creWorkflowId: string;
 }
 
 /// Fields of ProjectConfig that hold the address of a deployed contract.
@@ -79,6 +83,7 @@ export function loadProjectConfig(environment: Environment): ProjectConfig {
     orderRegistryAddress: "",
     creForwarderAddress: "",
     multiChainTxReceiverAddress: "",
+    creWorkflowId: "",
     ...JSON.parse(readFileSync(configUrl(environment), "utf8")),
   };
 }

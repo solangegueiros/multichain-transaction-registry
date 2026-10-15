@@ -187,10 +187,10 @@ Com `--broadcast` cada relatório vira uma transação de verdade na Sepolia, en
 
 ### 4. Publicar o workflow
 
-Publicar exige acesso antecipado ao CRE, a conta ligada com `cre account link-key`, o segredo enviado ao Vault DON e uma simulação bem-sucedida. Antes, troque o forwarder do receptor para o de verdade. O README dos smart contracts explica [a diferença entre os dois forwarders](../smart-contracts/README.md#5-publicar-a-estrutura-de-integração-com-chainlink-cre).
+Publicar exige acesso antecipado ao CRE, o segredo enviado ao Vault DON e uma simulação bem-sucedida. O workflow vai para o Private Registry (`deployment-registry: "private"` no [workflow.yaml](workflow.yaml)), autorizado pela sessão do `cre login`: não há registro na Ethereum mainnet nem carteira ligada. O receptor precisa estar com o forwarder de verdade; o de production já nasce com ele. O README dos smart contracts explica [a diferença entre os dois forwarders](../smart-contracts/README.md#5-publicar-a-estrutura-de-integração-com-chainlink-cre).
 
 ```powershell
-cre secrets create secrets.yaml --target production-settings
+cre secrets create secrets.yaml --target production-settings --secrets-auth=browser
 cre workflow deploy workflow-registry --target production-settings
 cre workflow activate workflow-registry --target production-settings
 ```

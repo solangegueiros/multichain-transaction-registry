@@ -23,6 +23,13 @@ import { sendTx } from "./lib/send-tx.js";
 //   creForwarderAddress filled  a new receiver is deployed with it, and an existing
 //                               receiver is updated to it (setForwarderAddress).
 //
+// The workflow restriction follows creWorkflowId, once the workflow is deployed:
+//
+//   creWorkflowId empty   the restriction of the receiver is left as it is
+//   creWorkflowId filled  the receiver accepts reports of this workflow only
+//                         (setExpectedWorkflowId). Refused while the receiver trusts the
+//                         MockKeystoneForwarder, which sends no workflow identity.
+//
 // The receiver is pointed to the OrderRegistry and the FundRegistry of that file,
 // and receives OPERATOR_ROLE in both and RELAYER_ROLE in MultiChainTxRegistry. Each of these
 // is done only when the account that runs the script is an admin of the contract involved;
@@ -174,6 +181,32 @@ if (same(currentForwarder, wantedForwarder)) {
   pending.push(`an admin of MultiChainTxReceiver must call setForwarderAddress(${wantedForwarder})`);
 }
 
+// ---------------------------------------------------------------- Workflow restriction
+
+// Accepted with or without the 0x prefix, as `cre workflow deploy` prints it without
+const wantedWorkflowId = projectConfig.creWorkflowId === "" ? "" : `0x${projectConfig.creWorkflowId.replace(/^0x/i, "")}`;
+
+if (wantedWorkflowId !== "" && !/^0x[0-9a-fA-F]{64}$/.test(wantedWorkflowId)) {
+  throw new Error(`creWorkflowId in ${configFile} is not a workflow id (32 bytes in hex): ${projectConfig.creWorkflowId}`);
+}
+
+if (wantedWorkflowId === "") {
+  // nothing to do: an empty field never removes a restriction already set
+} else if (same(await receiver.getExpectedWorkflowId(), wantedWorkflowId)) {
+  console.log(`\nWorkflow restriction: already ${wantedWorkflowId}`);
+} else if (same(currentForwarder, MOCK_FORWARDER)) {
+  // The mock sends no workflow identity: with the restriction, every report would be refused
+  pending.push(
+    `creWorkflowId is filled in ${configFile}, but the receiver trusts the MockKeystoneForwarder. ` +
+      `Set creForwarderAddress to ${PRODUCTION_FORWARDER} first; the restriction was not set`,
+  );
+} else if (deployerIsReceiverAdmin) {
+  const tx = await sendTx(() => receiver.setExpectedWorkflowId(wantedWorkflowId));
+  console.log(`\nWorkflow restriction set to ${wantedWorkflowId}, tx ${tx.hash}`);
+} else {
+  pending.push(`an admin of MultiChainTxReceiver must call setExpectedWorkflowId(${wantedWorkflowId})`);
+}
+
 // ---------------------------------------------------------------- OrderRegistry / FundRegistry
 
 // The receiver links transactions to orders and to funds through these two registries.
@@ -283,5 +316,6 @@ if (same(currentForwarder, MOCK_FORWARDER)) {
   console.log(`creForwarderAddress to ${PRODUCTION_FORWARDER} in ${configFile} and run this script again.`);
 } else if (!restricted) {
   console.log("\nNo workflow restriction is set: ANY workflow of ANY owner can deliver reports to this");
-  console.log("receiver. An admin should call setExpectedWorkflowId or setExpectedAuthor.");
+  console.log(`receiver. Once the workflow is deployed, fill creWorkflowId in ${configFile} with the id`);
+  console.log("that `cre workflow deploy` prints, and run this script again.");
 }

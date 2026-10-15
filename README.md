@@ -29,7 +29,7 @@ O repositório é dividido por partes, uma pasta para cada:
 | [project.yaml](project.yaml) e [secrets.yaml](secrets.yaml) | Configuração do CRE CLI: o RPC de cada target e o nome dos segredos do workflow. Nenhum dos dois guarda valores secretos |
 | [project.config.staging.json](project.config.staging.json) e [project.config.production.json](project.config.production.json) | Configuração pública compartilhada, uma por ambiente: URL do RPC da Sepolia, endereço do forwarder do Chainlink CRE e endereços dos contratos publicados. A tarefa de deploy preenche os endereços dos contratos. Veja [Ambientes](#ambientes-staging-e-production) |
 | `project.backup.config.json` | Histórico dos endereços de contratos substituídos em um novo deploy. Só existe depois da primeira substituição |
-| `.env` | Segredos compartilhados: chave privada de deploy, chave do Etherscan, chave da Observer API e chave da conta do CRE. Crie a partir do [.env.example](.env.example). Não é commitado |
+| `.env` | Segredos compartilhados: chave privada de deploy, chave do Etherscan, chave da Observer API e chave da conta do CRE. Crie a partir do [.env.example](.env.example). Fica fora do controle de versão, no `.gitignore` |
 | [package.json](package.json) | Atalhos para rodar da raiz os comandos de cada parte |
 | [query-json/](query-json/) | Respostas de API de exemplo, com fundos e ordens reais. São a referência de dados para todas as partes |
 
@@ -70,7 +70,7 @@ O projeto tem dois ambientes, cada um com os seus contratos, os dois na Ethereum
 | Rede nos comandos do Hardhat | `--network staging` | `--network production` |
 | Configuração do workflow | [config.staging.json](workflow-registry/config/config.staging.json), target `staging-settings` | [config.production.json](workflow-registry/config/config.production.json), target `production-settings` |
 | Forwarder do Chainlink CRE | o de simulação, para `cre workflow simulate --broadcast` | o de verdade, para o workflow publicado |
-| Frontend | `npm run frontend:dev` | `npm run frontend:dev:production` |
+| Frontend | `npm run frontend:dev`, com staging escolhido no rodapé do menu | o mesmo painel, com produção escolhida no rodapé do menu |
 | Situação | contratos publicados e em uso | contratos publicados; falta publicar o workflow: veja [Publicando em produção](#publicando-em-produção) |
 
 Depois de publicar os contratos de um ambiente, rode `npm run workflow:sync-config`. Ele copia os endereços de cada `project.config.<ambiente>.json` para a configuração do workflow do mesmo ambiente.
@@ -79,12 +79,12 @@ Depois de publicar os contratos de um ambiente, rode `npm run workflow:sync-conf
 
 O ambiente production tem contratos próprios, separados dos de staging, também na Ethereum Sepolia. Os passos abaixo publicam os contratos, ligam o workflow do Chainlink CRE a eles e restringem o receptor a esse workflow. Faça na ordem.
 
-**Situação atual.** Os passos 1 a 3 estão feitos: os contratos de production estão publicados, com as redes e os stablecoins registrados, e os endereços já estão no `project.config.production.json` e no `config.production.json`. O receptor usa o forwarder de verdade. Faltam os passos 4 e 5: publicar o workflow e restringir o receptor a ele.
+**Situação atual.** Os passos 1 a 3 estão feitos: os contratos de production estão publicados, com as redes e os stablecoins registrados, e os endereços já estão no `project.config.production.json` e no `config.production.json`. O receptor usa o forwarder de verdade. O workflow está publicado no Private Registry, com o id no `creWorkflowId`. Falta o passo 5: rodar o script do receptor para restringi-lo a esse workflow.
 
 ### 1. Antes de começar
 
 - **`.env` preenchido**, como descrito no [.env.example](.env.example). A conta de `ETH_PRIVATE_KEY` publica os contratos, vira admin deles e precisa de ETH da Sepolia para o gás. O `ETHERSCAN_API_KEY` é usado para verificar os contratos. O `API_OBSERVER_KEY` e o `CRE_ETH_PRIVATE_KEY` são do workflow.
-- **CRE CLI com sessão ativa**: `cre login`, conferido com `cre whoami`. Publicar um workflow exige acesso antecipado ao CRE e a conta ligada com `cre account link-key`.
+- **CRE CLI com sessão ativa**: `cre login`, conferido com `cre whoami`. Publicar um workflow exige acesso antecipado ao CRE. O workflow vai para o Private Registry, o registro do Chainlink fora da blockchain, definido em `deployment-registry: "private"` no [workflow.yaml](workflow-registry/workflow.yaml). Nele, a sessão do `cre login` autoriza tudo: não há registro na Ethereum mainnet, nem carteira ligada com `cre account link-key`. Para conferir que a sua organização tem esse registro, rode `cre registry list` e procure a linha com `ID: private`.
 - **Workflow testado em staging**, com `cre workflow simulate --broadcast`. Em production não há simulação com envio: o receptor de production só aceita relatórios do forwarder de verdade.
 - **[project.config.production.json](project.config.production.json) com os endereços vazios** e com o `creForwarderAddress` preenchido com o forwarder de verdade, `0xF8344CFd5c43616a4366C34E3EEE75af79a74482`. Endereços já preenchidos são reaproveitados: o script só publica o que falta.
 
@@ -104,7 +104,7 @@ O script roda os cinco passos: compila, publica e verifica no Etherscan `MultiCh
 
 No fim, o script avisa que nenhuma restrição de workflow está definida. É esperado: a restrição é o passo 5.
 
-### 3. Levar os endereços para o workflow
+### 3. Sincronizar os endereços no workflow
 
 ```powershell
 npm run workflow:sync-config
@@ -116,27 +116,53 @@ Faça um commit do `project.config.production.json` e do `config.production.json
 
 ### 4. Publicar o workflow
 
-Da raiz do repositório:
+Rode da raiz do repositório.
+
+Primeiro, envie ao Vault DON a chave da Observer API, que o [secrets.yaml](secrets.yaml) lê da variável `API_OBSERVER_KEY` do `.env`:
 
 ```powershell
-cre secrets create secrets.yaml --target production-settings
+cre secrets create secrets.yaml --target production-settings --secrets-auth=browser
+```
+
+O `--secrets-auth=browser` autoriza o envio pela sessão do `cre login`, como pede o Private Registry. Sem ele, o CLI tenta o caminho do registro na blockchain e falha pedindo um RPC da Ethereum mainnet.
+
+Publique o workflow:
+```powershell
 cre workflow deploy workflow-registry --target production-settings
+```
+
+O `deploy` mostra o id do workflow: guarde-o para o passo seguinte. O workflow é publicado pausado; depois do `activate`, ele roda sozinho a cada 5 minutos.
+
+Ative o workflow:
+
+```powershell
 cre workflow activate workflow-registry --target production-settings
 ```
 
-O primeiro comando envia a chave da Observer API ao Vault DON. O `deploy` mostra o id do workflow: guarde-o para o passo seguinte. Depois do `activate`, o workflow roda sozinho a cada 5 minutos.
 
 ### 5. Restringir o receptor ao workflow
 
-Sem restrição, qualquer workflow de qualquer dono consegue entregar relatórios ao receptor de production. Uma conta admin do `MultiChainTxReceiver` precisa chamar `setExpectedWorkflowId` com o id do passo 4. Não há script para isso: use, por exemplo, a aba "Write Contract" do receptor no Etherscan, que já está verificado. As outras restrições possíveis estão em [Registrando transações com Chainlink CRE](smart-contracts/README.md#registrando-transações-com-chainlink-cre).
+Sem restrição, qualquer workflow de qualquer dono consegue entregar relatórios ao receptor de production.
+
+Preencha `creWorkflowId` no `project.config.production.json` com o id do passo 4, com ou sem o `0x`, e rode o script do receptor de novo, de dentro de `smart-contracts/`:
+
+```powershell
+cd smart-contracts
+npx hardhat run scripts/deploy-cre-receiver.ts --network production
+cd ..
+```
+
+O script chama `setExpectedWorkflowId` no receptor, que passa a aceitar só os relatórios desse workflow. A conta de `ETH_PRIVATE_KEY` precisa ser admin do receptor; se não for, o script mostra a chamada que um admin precisa fazer. No resumo do fim, a linha `Workflow restriction` deve mostrar o id.
+
+Um novo `cre workflow deploy` do mesmo workflow, depois de uma mudança no código ou na configuração, gera outro id. Atualize o `creWorkflowId` e rode o script de novo, ou os relatórios do workflow novo são recusados. As outras restrições possíveis estão em [Registrando transações com Chainlink CRE](smart-contracts/README.md#registrando-transações-com-chainlink-cre).
 
 ### 6. Conferir
 
 ```powershell
-npm run frontend:dev:production
+npm run frontend:dev
 ```
 
-O rodapé do menu do painel deve mostrar "produção". Na página Estrutura, confira se o receptor usa o forwarder de produção e se a restrição de workflow está definida. Na página Sincronização, com a chave da Observer API, acompanhe os relatórios sendo registrados a cada execução.
+No rodapé do menu do painel, escolha "produção". Na página Estrutura, confira se o receptor usa o forwarder de produção e se a restrição de workflow está definida. Na página Sincronização, com a chave da Observer API, acompanhe os relatórios sendo registrados a cada execução.
 
 ## Comandos da raiz
 
@@ -158,12 +184,9 @@ O [package.json](package.json) da raiz não tem dependências próprias. Ele só
 | `npm run workflow:simulate` | Simula o workflow no target `local-simulation`: lê a Observer API e mostra os relatórios que enviaria, sem gravar |
 | `npm run workflow:sync-config` | Copia os endereços dos contratos de cada `project.config.<ambiente>.json` para a configuração do workflow do mesmo ambiente |
 | `npm run frontend:install` | Instala as dependências do frontend |
-| `npm run frontend:dev` | Abre o painel do ambiente staging em `http://localhost:5173` |
-| `npm run frontend:dev:production` | Abre o painel do ambiente production |
-| `npm run frontend:build` | Confere os tipos e empacota o painel de staging em `frontend/dist/staging/` |
-| `npm run frontend:build:production` | O mesmo para production, em `frontend/dist/production/` |
+| `npm run frontend:dev` | Abre o painel em `http://localhost:5173`. O ambiente é escolhido no rodapé do menu |
+| `npm run frontend:build` | Confere os tipos e empacota o painel em `frontend/dist/`, com os dois ambientes |
 | `npm run frontend:preview` | Serve o pacote gerado pelo `build` |
-| `npm run frontend:preview:production` | Serve o pacote gerado pelo `build:production` |
 | `npm run frontend:sync-abi` | Atualiza as ABIs do frontend a partir dos contratos compilados |
 
 Estes atalhos são para os comandos sem opções: instalar, compilar, testar e experimentar na rede simulada do Hardhat. Sem opções, `contracts:deploy`, `contracts:register-chains` e `contracts:register-stablecoins` rodam na rede simulada e não publicam nada de verdade.

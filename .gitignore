@@ -7,6 +7,7 @@ dist/
 
 # Chainlink CRE workflow build output
 *.wasm
+*.wasm.br.b64
 .cre_build_tmp*
 
 # Local overrides of the frontend

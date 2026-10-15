@@ -148,6 +148,51 @@ a:hover {
   font-weight: 500;
 }
 
+.env-toggle {
+  display: inline-flex;
+  margin-top: 10px;
+  padding: 2px;
+  border: 1px solid color-mix(in srgb, var(--surface) 45%, transparent);
+  border-radius: 999px;
+}
+.env-toggle button {
+  padding: 3px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--surface);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.env-toggle button[aria-pressed="true"] {
+  background: var(--surface);
+  color: var(--navy);
+  cursor: default;
+}
+.env-toggle button:focus-visible {
+  outline: 2px solid var(--surface);
+  outline-offset: 2px;
+}
+
+/* Copy of the toggle at the top, for narrow screens: navy on cream */
+.env-toggle-top {
+  display: none;
+  margin-top: 0;
+  border-color: color-mix(in srgb, var(--navy) 35%, transparent);
+}
+.env-toggle-top button {
+  color: var(--navy);
+}
+.env-toggle-top button[aria-pressed="true"] {
+  background: var(--navy);
+  color: var(--surface);
+}
+.env-toggle-top button:focus-visible {
+  outline-color: var(--navy);
+}
+
 main {
   flex: 1;
   min-width: 0;
@@ -168,6 +213,7 @@ main {
   }
   .brand {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 12px;
     padding: 10px 16px;
@@ -177,6 +223,11 @@ main {
   }
   .brand span {
     margin: 0;
+  }
+  .env-toggle-top {
+    display: inline-flex;
+    flex-shrink: 0;
+    margin-left: auto;
   }
   .nav-groups {
     display: flex;

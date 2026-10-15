@@ -4,5 +4,6 @@
   "fundRegistryAddress": "0x84521183c51ff51f16044c2458E471BE997cDb54",
   "orderRegistryAddress": "0xf4bA474dF3d9C26332a8a86a6484F2a15Ee640cc",
   "creForwarderAddress": "0xF8344CFd5c43616a4366C34E3EEE75af79a74482",
-  "multiChainTxReceiverAddress": "0x57c0e78Fc209F3e63e0EbF1D190DC04A898BaC42"
+  "multiChainTxReceiverAddress": "0x57c0e78Fc209F3e63e0EbF1D190DC04A898BaC42",
+  "creWorkflowId": "0x0023824eb06aa8f8e03fb4634c9ebceccf492635b00749f5ef714c4fd255d8be"
 }

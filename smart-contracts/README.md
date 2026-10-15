@@ -76,6 +76,7 @@ Os valores públicos ficam em um arquivo por ambiente, [project.config.staging.j
 | `orderRegistryAddress` | Endereço do `OrderRegistry` publicado. Fica vazio até o deploy |
 | `creForwarderAddress` | Endereço do forwarder do Chainlink CRE, que entrega os relatórios ao `MultiChainTxReceiver`. Você preenche. Vazio, vale o forwarder de simulação |
 | `multiChainTxReceiverAddress` | Endereço do `MultiChainTxReceiver` publicado. Fica vazio até o passo 5 |
+| `creWorkflowId` | Id do workflow publicado, mostrado por `cre workflow deploy`. Você preenche. Preenchido, o receptor aceita só esse workflow. Vazio, a restrição do receptor não é alterada |
 
 Os endereços dos contratos são preenchidos pela tarefa de deploy e pelo script do receptor. Só o `creForwarderAddress` é preenchido à mão; os valores estão em [5. Publicar a estrutura de integração com Chainlink CRE](#5-publicar-a-estrutura-de-integração-com-chainlink-cre).
 
@@ -296,7 +297,7 @@ O caminho recomendado:
 #### Deploy em Chainlink CRE
 3. Preencha `creForwarderAddress` com `0xF8344CFd5c43616a4366C34E3EEE75af79a74482` no `project.config.<ambiente>.json`.
 4. Rode o script de novo. Ele troca o forwarder do receptor já publicado, sem publicar outro.
-5. Publique o workflow e restrinja o receptor a ele, com `setExpectedWorkflowId` ou `setExpectedAuthor`.
+5. Publique o workflow, preencha `creWorkflowId` com o id que o `cre workflow deploy` mostra e rode o script de novo. Ele restringe o receptor ao workflow, com `setExpectedWorkflowId`.
 
 > Depois do passo 4, o receptor deixa de aceitar a simulação. Para voltar a simular, preencha `creForwarderAddress` com o endereço do mock e rode o script, ou publique um segundo receptor só para testes.
 
@@ -305,6 +306,7 @@ O que mais o script faz:
 - **Reaproveita o receptor.** Com `multiChainTxReceiverAddress` preenchido, ele não publica outro. Com o campo vazio, publica, grava o endereço no arquivo e verifica no Etherscan. Para publicar de novo, apague o campo.
 - **Aponta o receptor para o `OrderRegistry` e o `FundRegistry`** do `project.config.<ambiente>.json`, com `setOrderRegistry` e `setFundRegistry`. Se um deles for publicado de novo, basta rodar o script outra vez para o receptor passar a usar o novo.
 - **Concede os papéis**: `RELAYER_ROLE` no `MultiChainTxRegistry` e `OPERATOR_ROLE` no `OrderRegistry` e no `FundRegistry`. Cada concessão só é feita se a conta for admin do contrato em questão. Se não for, o script mostra a chamada que um admin precisa fazer.
+- **Restringe o receptor ao workflow.** Com `creWorkflowId` preenchido, chama `setExpectedWorkflowId` com esse id. Com o campo vazio, não mexe na restrição. Se o receptor usar o Mock Forwarder, o script não define a restrição e avisa: o mock não envia a identidade do workflow, e todo relatório seria recusado.
 - **Confere a ligação.** Se o receptor do arquivo estiver ligado a outro `MultiChainTxRegistry`, o script para e pede para apagar o campo.
 - **Mostra o estado final**: o forwarder em uso, se é o mock ou o de verdade, e se há restrição de workflow. Com o forwarder de verdade e sem restrição, ele avisa que qualquer workflow consegue gravar.
 
@@ -687,7 +689,7 @@ A função existe para quem tem poucas chamadas disponíveis, como o [workflow d
 | [scripts/lib/send-tx.ts](scripts/lib/send-tx.ts) | Envio de transação com nova tentativa quando o nó acusa uma transação pendente da conta |
 | [project-config.ts](project-config.ts) | Lê e grava o `project.config.<ambiente>.json` da raiz e diz qual ambiente cada rede usa |
 | [../project.config.staging.json](../project.config.staging.json) e [../project.config.production.json](../project.config.production.json) | Configuração pública de cada ambiente, na raiz do repositório |
-| `../.env` | Segredos, na raiz do repositório. Não é commitado |
+| `../.env` | Segredos, na raiz do repositório. Fica fora do controle de versão, no `.gitignore` |
 | `../project.backup.config.json` | Histórico dos endereços substituídos por `--only` ou `--force`. Criado pela tarefa `deploy` na primeira substituição |
 | [hardhat.config.ts](hardhat.config.ts) | Compilador, rede e verificação |
 | [MultiChainTxRegistry.md](MultiChainTxRegistry.md) | Exemplos de dados |
