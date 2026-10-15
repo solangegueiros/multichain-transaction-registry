@@ -104,7 +104,7 @@ Só a página de sincronização usa a Observer API, e ela pede a chave na tela.
 - O botão "Esquecer a chave" a apaga.
 - Ela não entra no código, no `.env` nem no pacote gerado.
 
-Sem a chave, as outras páginas funcionam normalmente.
+Sem a chave, as outras páginas funcionam normalmente, e a de sincronização mostra só o que já está atestado.
 
 **A Observer API precisa de um proxy.** A API não aceita os cabeçalhos `X-Observer-Id` e `X-Observer-Key` em chamadas feitas direto de um navegador. Por isso o painel chama o caminho `/observer-api/<ambiente>`, e o servidor repassa a chamada à API configurada no workflow do mesmo ambiente. O `npm run frontend:dev` e o `npm run frontend:preview` já fazem esse repasse, configurado em [vite.config.ts](vite.config.ts). Em uma hospedagem de arquivos estáticos, a página de sincronização só funciona se o servidor tiver uma regra equivalente. As outras páginas não dependem disso.
 
@@ -174,7 +174,7 @@ Nenhum segredo vai nesse arquivo: tudo o que está em uma variável `VITE_` acab
 - **Transação da Sepolia só em Transações e na Sincronização.** Os contratos não guardam qual transação da Sepolia atestou cada coisa. A página de Transações acha a de cada transação pelo evento `TxRegistered` do `MultiChainTxRegistry`, no bloco da data da atestação: são 3 ou 4 consultas ao RPC por linha. A lista "Registrado" da Sincronização tira isso dos eventos do `MultiChainTxReceiver`. As páginas de fundo e de ordem mostram só o estado atual.
 - **A leitura de eventos depende do RPC.** O RPC público devolve no máximo 50.000 blocos por consulta, e parte dos nós dele só guarda blocos recentes e recusa a consulta. O painel tenta de novo até dar certo e lê o histórico em faixas, de volta até o deploy do receptor. A primeira abertura da página fica mais lenta conforme o receptor envelhece: são cerca de 5 consultas por mês de histórico. Depois disso, só os blocos novos são lidos. Para um histórico longo, o caminho certo é um RPC com histórico completo ou um indexador.
 - **"Registrado" mostra só o que passou pelo workflow.** Um registro feito direto por uma conta operadora, sem o receptor, não aparece na lista. E só entram as ordens que a Observer API ainda devolve.
-- **Sem a Observer API, só o que está atestado.** Se a chave é recusada ou a API não responde, a Sincronização lista os fundos já atestados e mostra deles as ordens, as transações e a lista "Registrado". O que falta registrar fica indisponível, e um fundo que só a API conhece não aparece.
+- **Sem a Observer API, só o que está atestado.** Sem a chave, com a chave recusada ou com a API fora do ar, a Sincronização lista os fundos já atestados e mostra deles as ordens, as transações e a lista "Registrado". Uma mensagem avisa o motivo, as colunas que dependem da API ficam com "—", o que falta registrar fica indisponível, e um fundo que só a API conhece não aparece.
 - **Rayls sem explorador.** A rede `eip155:7295799` não tem explorador configurado, então os hashes dela aparecem sem link.
 
 ## Status

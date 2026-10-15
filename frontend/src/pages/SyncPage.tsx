@@ -38,20 +38,21 @@ export default function SyncPage() {
     retry: false,
     refetchInterval: 60_000,
   });
-  // When the API cannot be read, the funds the registries already have are shown instead
+  // Without a key, or when the API cannot be read, the funds the registries already have
+  // are shown instead, with what depends on the API marked as unavailable
+  const apiUnavailable = key === "" || list.isError;
   const onchainList = useQuery({
     queryKey: ["onchain-funds"],
     queryFn: listOnchainFunds,
-    enabled: key !== "" && list.isError,
+    enabled: apiUnavailable,
     refetchInterval: 60_000,
   });
-  const funds = (list.isError ? onchainList.data : list.data) ?? [];
+  const funds = (apiUnavailable ? onchainList.data : list.data) ?? [];
 
   const results = useQueries({
     queries: funds.map(({ fundId }) => ({
       queryKey: ["sync", fundId, key],
       queryFn: () => compareFund(fundId, key),
-      enabled: key !== "",
       // a refused key does not get better by trying again
       retry: false,
       refetchInterval: 60_000,
@@ -86,8 +87,8 @@ export default function SyncPage() {
               </button>
             </div>
             <p className="empty">
-              A chave fica guardada só neste navegador e é enviada apenas para a Observer API. Sem ela, as outras páginas
-              continuam funcionando.
+              A chave fica guardada só neste navegador e é enviada apenas para a Observer API. Sem ela, esta página mostra
+              só o que já está atestado, e as outras páginas funcionam normalmente.
             </p>
           </>
         ) : (
@@ -100,65 +101,67 @@ export default function SyncPage() {
         )}
       </section>
 
-      {key !== "" && (
-        <>
-          <section className="panel">
-            <h2>Fundos</h2>
-            <p className="empty" style={{ paddingTop: 0 }}>
-              Fundos que a chave pode ver na Observer API, os mesmos que o workflow registra. Escolha um para ver os
-              detalhes.
-            </p>
-            {list.isPending && <p className="loading">Carregando…</p>}
-            {list.isError && (
-              <p className="error">
-                {list.error instanceof Error ? list.error.message : String(list.error)} Mostrando só os fundos já
-                atestados.
-              </p>
-            )}
-            {list.isSuccess && funds.length === 0 && <p className="empty">A Observer API não devolveu nenhum fundo.</p>}
-            {list.isError && onchainList.isPending && <p className="loading">Carregando…</p>}
-            {onchainList.isError && (
-              <p className="error">
-                {onchainList.error instanceof Error ? onchainList.error.message : String(onchainList.error)}
-              </p>
-            )}
-            {onchainList.isSuccess && funds.length === 0 && <p className="empty">Nenhum fundo atestado ainda.</p>}
-            <TableWrap hidden={funds.length === 0}>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Fundo</th>
-                    <th>Atestado</th>
-                    <th className="num">Ordens na API</th>
-                    <th className="num">Ordens Atestadas</th>
-                    <th className="num">Tx Atestadas</th>
-                    <th>A registrar</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {funds.map((fund, i) => (
-                    <FundRow
-                      key={fund.fundId}
-                      fund={fund}
-                      query={results[i]}
-                      selected={fund.fundId === selected}
-                      onSelect={() => setParams({ fund: fund.fundId })}
-                    />
-                  ))}
-                </tbody>
-              </table>
-            </TableWrap>
-          </section>
+      <section className="panel">
+        <h2>Fundos</h2>
+        <p className="empty" style={{ paddingTop: 0 }}>
+          {apiUnavailable
+            ? "Fundos já atestados. Escolha um para ver os detalhes."
+            : "Fundos que a chave pode ver na Observer API, os mesmos que o workflow registra. Escolha um para ver os detalhes."}
+        </p>
+        {key !== "" && list.isPending && <p className="loading">Carregando…</p>}
+        {apiUnavailable && (
+          <p className="error">
+            {key === ""
+              ? "Sem a chave da Observer API."
+              : list.error instanceof Error
+                ? list.error.message
+                : String(list.error)}{" "}
+            Mostrando só os fundos já atestados. Os fundos que só a API conhece não aparecem, e as colunas que dependem
+            dela ficam com “—”.
+          </p>
+        )}
+        {list.isSuccess && funds.length === 0 && <p className="empty">A Observer API não devolveu nenhum fundo.</p>}
+        {apiUnavailable && onchainList.isPending && <p className="loading">Carregando…</p>}
+        {apiUnavailable && onchainList.isError && (
+          <p className="error">
+            {onchainList.error instanceof Error ? onchainList.error.message : String(onchainList.error)}
+          </p>
+        )}
+        {apiUnavailable && onchainList.isSuccess && funds.length === 0 && <p className="empty">Nenhum fundo atestado ainda.</p>}
+        <TableWrap hidden={funds.length === 0}>
+          <table>
+            <thead>
+              <tr>
+                <th>Fundo</th>
+                <th>Atestado</th>
+                <th className="num">Ordens na API</th>
+                <th className="num">Ordens Atestadas</th>
+                <th className="num">Tx Atestadas</th>
+                <th>A registrar</th>
+              </tr>
+            </thead>
+            <tbody>
+              {funds.map((fund, i) => (
+                <FundRow
+                  key={fund.fundId}
+                  fund={fund}
+                  query={results[i]}
+                  selected={fund.fundId === selected}
+                  onSelect={() => setParams({ fund: fund.fundId })}
+                />
+              ))}
+            </tbody>
+          </table>
+        </TableWrap>
+      </section>
 
-          {selectedIndex === -1 ? (
-            <section className="panel">
-              <h2>Detalhes do fundo</h2>
-              <p className="empty">Nenhum fundo escolhido.</p>
-            </section>
-          ) : (
-            <FundDetails fund={funds[selectedIndex]} query={results[selectedIndex]} />
-          )}
-        </>
+      {selectedIndex === -1 ? (
+        <section className="panel">
+          <h2>Detalhes do fundo</h2>
+          <p className="empty">Nenhum fundo escolhido.</p>
+        </section>
+      ) : (
+        <FundDetails fund={funds[selectedIndex]} query={results[selectedIndex]} />
       )}
     </>
   );
@@ -223,7 +226,7 @@ function FundRow({
 }
 
 function PendingBadge({ sync }: { sync: FundSync }) {
-  if (sync.apiError !== null) return <Badge tone="bad">erro na leitura da API</Badge>;
+  if (sync.apiError !== null) return <Badge tone="warn">sem a API</Badge>;
   if (sync.problems.length > 0) return <Badge tone="bad">{`${sync.pending.length} · com problemas`}</Badge>;
   if (sync.blockers.length > 0) return <Badge tone="bad">{`${sync.pending.length} · falta cadastro`}</Badge>;
   return (

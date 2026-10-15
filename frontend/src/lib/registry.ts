@@ -395,9 +395,20 @@ const deployBlock = {
 const isDeployment = (log: ReceiverLog): boolean =>
   log.eventName === "RoleGranted" && log.args.role === ZERO_BYTES32 && log.args.account === log.args.sender;
 
+/// Read in progress. The sync page asks once per fund, at the same time: the calls share
+/// one read, or each would append the same blocks to the cache and repeat every report.
+let reading: Promise<DeliveredReport[]> | null = null;
+
 /// Every report the receiver applied since it was deployed, oldest first.
 /// The contracts do not store which transaction registered each thing: the events do.
-export async function getDeliveredReports(): Promise<DeliveredReport[]> {
+export function getDeliveredReports(): Promise<DeliveredReport[]> {
+  reading ??= readDeliveredReports().finally(() => {
+    reading = null;
+  });
+  return reading;
+}
+
+async function readDeliveredReports(): Promise<DeliveredReport[]> {
   if (!CONTRACTS.receiver) return [];
   const address = CONTRACTS.receiver;
   const latest = await logsClient.getBlockNumber();

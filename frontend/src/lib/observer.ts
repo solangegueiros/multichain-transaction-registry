@@ -139,11 +139,15 @@ export type Blocker = {
 
 /// What the API has about a fund that the registries do not have yet.
 export async function compareFund(fundId: string, key: string): Promise<FundSync> {
-  // A failure of the API must not hide what the registries have: it is kept apart
-  const api = Promise.all([apiGet(`/funds/${fundId}`, key), apiGet(`/funds/${fundId}/debenture-orders`, key)]).then(
-    (replies) => ({ replies, error: null }),
-    (err: unknown) => ({ replies: [null, null] as const, error: err instanceof Error ? err.message : String(err) }),
-  );
+  // A failure of the API, or a missing key, must not hide what the registries have: it is kept apart
+  type ApiReplies = { replies: readonly [Record<string, unknown> | null, Record<string, unknown> | null]; error: string | null };
+  const api: Promise<ApiReplies> =
+    key === ""
+      ? Promise.resolve({ replies: [null, null], error: "Sem a chave da Observer API." })
+      : Promise.all([apiGet(`/funds/${fundId}`, key), apiGet(`/funds/${fundId}/debenture-orders`, key)]).then(
+          (replies) => ({ replies, error: null }),
+          (err: unknown) => ({ replies: [null, null], error: err instanceof Error ? err.message : String(err) }),
+        );
   const [{ replies, error: apiError }, onchainFund, chains, stableCoins, delivered] = await Promise.all([
     api,
     getFund(fundId),
