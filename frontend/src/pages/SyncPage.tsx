@@ -109,17 +109,6 @@ export default function SyncPage() {
             : "Fundos que a chave pode ver na Observer API, os mesmos que o workflow registra. Escolha um para ver os detalhes."}
         </p>
         {key !== "" && list.isPending && <p className="loading">Carregando…</p>}
-        {apiUnavailable && (
-          <p className="error">
-            {key === ""
-              ? "Sem a chave da Observer API."
-              : list.error instanceof Error
-                ? list.error.message
-                : String(list.error)}{" "}
-            Mostrando só os fundos já atestados. Os fundos que só a API conhece não aparecem, e as colunas que dependem
-            dela ficam com “—”.
-          </p>
-        )}
         {list.isSuccess && funds.length === 0 && <p className="empty">A Observer API não devolveu nenhum fundo.</p>}
         {apiUnavailable && onchainList.isPending && <p className="loading">Carregando…</p>}
         {apiUnavailable && onchainList.isError && (
@@ -153,6 +142,16 @@ export default function SyncPage() {
             </tbody>
           </table>
         </TableWrap>
+        {apiUnavailable && (
+          <p className="error">
+            {key === ""
+              ? "Sem a chave da Observer API."
+              : list.error instanceof Error
+                ? list.error.message
+                : String(list.error)}{" "}
+            Mostrando os fundos atestados. Não são listados os fundos que estão apenas na API - não atestados.
+          </p>
+        )}
       </section>
 
       {selectedIndex === -1 ? (
@@ -161,7 +160,7 @@ export default function SyncPage() {
           <p className="empty">Nenhum fundo escolhido.</p>
         </section>
       ) : (
-        <FundDetails fund={funds[selectedIndex]} query={results[selectedIndex]} />
+        <FundDetails fund={funds[selectedIndex]} query={results[selectedIndex]} listReadFromApi={!apiUnavailable} />
       )}
     </>
   );
@@ -240,7 +239,17 @@ function PendingBadge({ sync }: { sync: FundSync }) {
 // PART 2: details of the chosen fund
 // ============================================================
 
-function FundDetails({ fund, query }: { fund: ApiFundEntry; query: UseQueryResult<FundSync> }) {
+/// listReadFromApi: the list of funds came from the API. A failure here is then about this
+/// fund alone, and its error is shown; otherwise the message above the details already says why.
+function FundDetails({
+  fund,
+  query,
+  listReadFromApi,
+}: {
+  fund: ApiFundEntry;
+  query: UseQueryResult<FundSync>;
+  listReadFromApi: boolean;
+}) {
   const { fundId } = fund;
   return (
     <section className="panel">
@@ -302,12 +311,7 @@ function FundDetails({ fund, query }: { fund: ApiFundEntry; query: UseQueryResul
               </p>
             ))}
 
-            {sync.apiError !== null && (
-              <p className="error">
-                {sync.apiError} Sem a API não dá para saber o que falta registrar; abaixo, só o que já está
-                atestado.
-              </p>
-            )}
+            {listReadFromApi && sync.apiError !== null && <p className="error">{sync.apiError}</p>}
 
             <h3>A registrar</h3>
             {sync.apiError !== null ? (
