@@ -93,7 +93,7 @@ npx hardhat deploy --network staging
 npx hardhat deploy --network production
 ```
 
-Todo comando deste documento funciona com qualquer uma das duas redes. Os exemplos usam `--network staging`; troque por `--network production` para o outro ambiente. Os contratos de production ainda não foram publicados: os endereços do arquivo estão vazios.
+Todo comando deste documento funciona com qualquer uma das duas redes. Os exemplos usam `--network staging`; troque por `--network production` para o outro ambiente. Os contratos dos dois ambientes estão publicados.
 
 Os scripts mostram no começo da saída a rede e o arquivo que estão usando, nas linhas `Network:` e `Addresses:`. Confira antes de seguir, principalmente em production.
 
@@ -700,7 +700,7 @@ Os quatro contratos têm testes automatizados (`npm test`): `MultiChainTxRegistr
 
 No ambiente staging, os quatro estão publicados na Ethereum Sepolia, nos endereços do [project.config.staging.json](../project.config.staging.json). As redes, as chaves de schema e os stablecoins estão registrados. O receptor usa o forwarder de simulação do Chainlink CRE.
 
-No ambiente production, nada foi publicado ainda: os endereços do [project.config.production.json](../project.config.production.json) estão vazios.
+No ambiente production, os quatro também estão publicados na Ethereum Sepolia, nos endereços do [project.config.production.json](../project.config.production.json), com as redes, as chaves de schema e os stablecoins registrados. O receptor usa o forwarder de verdade do Chainlink CRE e ainda não tem restrição de workflow: ela é definida depois de o workflow ser publicado.
 
 Ainda não há fundos, ordens nem transações registrados: essa carga é feita pelo [workflow do Chainlink CRE](../workflow-registry/README.md), que ainda não foi executado com `--broadcast`.
 

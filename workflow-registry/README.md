@@ -117,7 +117,7 @@ Execute na raiz do projeto:
 npm run sync-config
 ```
 
-O `config.staging.json` já está com os endereços dos contratos de staging. O `config.production.json` está com os endereços vazios, porque os contratos de production ainda não foram publicados: até lá, o target `production-settings` não roda. Rode o comando de novo sempre que um contrato for publicado outra vez. Um ambiente sem contratos é pulado, com um aviso, e o outro é atualizado mesmo assim.
+As duas configurações já estão com os endereços dos contratos do seu ambiente. Rode o comando de novo sempre que um contrato for publicado outra vez. Um ambiente sem contratos é pulado, com um aviso, e o outro é atualizado mesmo assim.
 
 ## Simulação local
 
@@ -291,7 +291,8 @@ O teste precisa das dependências do workflow instaladas, com `bun install --cwd
 | Relatórios entregues aos contratos na rede simulada do Hardhat | Executado, 6 testes passando, lendo o estado com `getOrderSyncStates` |
 | Modo `production` lendo contratos em um nó local, sem enviar | Executado: 3 leituras para conferir as 13 ordens de um fundo |
 | Contratos de staging publicados na Sepolia, com redes e stablecoins registrados | Feito. Os endereços estão no [project.config.staging.json](../project.config.staging.json) e no `config.staging.json` |
-| Contratos de production | Não publicados. O `config.production.json` está com os endereços vazios |
+| Contratos de production publicados na Sepolia, com redes e stablecoins registrados | Feito. Os endereços estão no [project.config.production.json](../project.config.production.json) e no `config.production.json` |
+| Workflow publicado no target `production-settings` | Não feito. Os passos estão em [Publicando em produção](../README.md#publicando-em-produção) |
 | Simulação `staging-settings` lendo os contratos da Sepolia, sem enviar | Executada: os quatro fundos passaram nas conferências de rede e de stablecoin, e os quatro relatórios `REGISTER_FUND` ficaram prontos para envio |
 | Simulação com `--broadcast` na Sepolia, com `gasLimit` de 2.500.000 | Executada: as 5 transações foram mineradas, mas nenhum relatório foi aplicado, por falta de gás |
 | Os mesmos 5 relatórios simulados sobre o estado da Sepolia, sem enviar | Executado: os 5 são aplicados com gás suficiente |

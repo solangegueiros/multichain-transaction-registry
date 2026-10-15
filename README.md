@@ -71,7 +71,7 @@ O projeto tem dois ambientes, cada um com os seus contratos, os dois na Ethereum
 | Configuração do workflow | [config.staging.json](workflow-registry/config/config.staging.json), target `staging-settings` | [config.production.json](workflow-registry/config/config.production.json), target `production-settings` |
 | Forwarder do Chainlink CRE | o de simulação, para `cre workflow simulate --broadcast` | o de verdade, para o workflow publicado |
 | Frontend | `npm run frontend:dev` | `npm run frontend:dev:production` |
-| Situação | contratos publicados e em uso | contratos ainda não publicados: veja [Publicando em produção](#publicando-em-produção) |
+| Situação | contratos publicados e em uso | contratos publicados; falta publicar o workflow: veja [Publicando em produção](#publicando-em-produção) |
 
 Depois de publicar os contratos de um ambiente, rode `npm run workflow:sync-config`. Ele copia os endereços de cada `project.config.<ambiente>.json` para a configuração do workflow do mesmo ambiente.
 
@@ -79,12 +79,14 @@ Depois de publicar os contratos de um ambiente, rode `npm run workflow:sync-conf
 
 O ambiente production tem contratos próprios, separados dos de staging, também na Ethereum Sepolia. Os passos abaixo publicam os contratos, ligam o workflow do Chainlink CRE a eles e restringem o receptor a esse workflow. Faça na ordem.
 
+**Situação atual.** Os passos 1 a 3 estão feitos: os contratos de production estão publicados, com as redes e os stablecoins registrados, e os endereços já estão no `project.config.production.json` e no `config.production.json`. O receptor usa o forwarder de verdade. Faltam os passos 4 e 5: publicar o workflow e restringir o receptor a ele.
+
 ### 1. Antes de começar
 
 - **`.env` preenchido**, como descrito no [.env.example](.env.example). A conta de `ETH_PRIVATE_KEY` publica os contratos, vira admin deles e precisa de ETH da Sepolia para o gás. O `ETHERSCAN_API_KEY` é usado para verificar os contratos. O `API_OBSERVER_KEY` e o `CRE_ETH_PRIVATE_KEY` são do workflow.
 - **CRE CLI com sessão ativa**: `cre login`, conferido com `cre whoami`. Publicar um workflow exige acesso antecipado ao CRE e a conta ligada com `cre account link-key`.
 - **Workflow testado em staging**, com `cre workflow simulate --broadcast`. Em production não há simulação com envio: o receptor de production só aceita relatórios do forwarder de verdade.
-- **[project.config.production.json](project.config.production.json) com os endereços vazios** e com o `creForwarderAddress` preenchido com o forwarder de verdade, `0xF8344CFd5c43616a4366C34E3EEE75af79a74482`. É assim que o arquivo está no repositório.
+- **[project.config.production.json](project.config.production.json) com os endereços vazios** e com o `creForwarderAddress` preenchido com o forwarder de verdade, `0xF8344CFd5c43616a4366C34E3EEE75af79a74482`. Endereços já preenchidos são reaproveitados: o script só publica o que falta.
 
 ### 2. Publicar os contratos
 

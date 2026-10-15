@@ -181,4 +181,4 @@ Nenhum segredo vai nesse arquivo: tudo o que está em uma variável `VITE_` acab
 | Comparação da página de sincronização | Executada contra um nó local, com as respostas de exemplo no lugar da API |
 | Página de sincronização com a chave e a API de verdade | Não conferida no navegador |
 
-Os contratos de production ainda não foram publicados. Até lá, o painel de production mostra que os contratos não estão publicados.
+Os contratos de production estão publicados, mas o workflow de production ainda não. Até ele rodar, o painel de production mostra os contratos vazios, sem fundos, ordens nem transações.
