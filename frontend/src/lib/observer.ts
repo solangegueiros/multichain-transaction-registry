@@ -54,6 +54,14 @@ async function apiGet(path: string, key: string): Promise<Record<string, unknown
   const response = await fetch(`${OBSERVER.proxyPath}${path}`, {
     headers: { "X-Observer-Id": OBSERVER.clientId, "X-Observer-Key": key, Accept: "application/json" },
   });
+  // The API answers JSON even for its errors. Anything else came from the server of the
+  // panel itself (its page, or its own 404): the proxy to the API is not configured there.
+  if (!(response.headers.get("content-type") ?? "").includes("json")) {
+    throw new Error(
+      `Sem acesso à Observer API: o servidor do painel não está encaminhando as chamadas de ${OBSERVER.proxyPath}/ ` +
+        `(HTTP ${response.status}). Veja a seção "Publicar" no README do frontend.`,
+    );
+  }
   if (response.status === 404) return null;
   if (!response.ok) throw new ObserverApiError(response.status, path);
   return (await response.json()) as Record<string, unknown>;

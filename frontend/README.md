@@ -75,7 +75,63 @@ npm run frontend:preview
 
 O `build` confere os tipos e gera o site em `frontend/dist/`. O `preview` serve essa pasta em [http://localhost:4173](http://localhost:4173), do jeito que ela vai ficar publicada.
 
-Para publicar, hospede o conteúdo de `frontend/dist/` em qualquer servidor de arquivos estáticos. A página de Sincronização precisa também de um repasse para a Observer API, explicado em [Chave da Observer API](#chave-da-observer-api).
+Para publicar, hospede o conteúdo de `frontend/dist/` em qualquer servidor de arquivos estáticos. As rotas do painel ficam depois do `#` no endereço, então o servidor só precisa entregar o `index.html` e os arquivos da pasta.
+
+#### Repasse para a Observer API
+
+A página de Sincronização precisa de mais uma regra no servidor. O navegador não pode chamar a Observer API direto (veja [Chave da Observer API](#chave-da-observer-api)), então o painel chama `/observer-api/staging/...` e `/observer-api/production/...` no próprio servidor, que repassa para a API do workflow de cada ambiente:
+
+| Caminho no servidor do painel | Repassa para |
+|---|---|
+| `/observer-api/staging/<resto>` | `apiBaseUrl` do [config.staging.json](../workflow-registry/config/config.staging.json), seguido de `/<resto>` |
+| `/observer-api/production/<resto>` | `apiBaseUrl` do [config.production.json](../workflow-registry/config/config.production.json), seguido de `/<resto>` |
+
+Hoje os dois ambientes usam a mesma API, `https://dev-api-mercado-bitcoin.web3up.mobi/v1/external/observer`. Os cabeçalhos `X-Observer-Id` e `X-Observer-Key` precisam ser repassados como chegam.
+
+**Hospedagem compartilhada (cPanel, Plesk), já incluída no pacote.** Em hospedagem compartilhada não dá para configurar o servidor, então o repasse é feito por um script PHP que o `build` já coloca em `frontend/dist/`:
+
+| Arquivo | Função |
+|---|---|
+| `observer-api.php` | Recebe a chamada do painel e a repassa à API do ambiente, só com os cabeçalhos `X-Observer-Id`, `X-Observer-Key` e `Accept`. Aceita só `GET` e só caminhos da API |
+| `observer-api.config.json` | A API de cada ambiente, gerada no `build` a partir do `apiBaseUrl` das configurações do workflow |
+| `.htaccess` | Regra do Apache (cPanel) que manda `/observer-api/<ambiente>/...` para o `observer-api.php` |
+| `web.config` | A mesma regra para o IIS (Plesk em Windows). Precisa do módulo URL Rewrite |
+
+Basta enviar a pasta `dist/` inteira para a pasta do site, como antes. A hospedagem precisa ter PHP com a extensão `curl`, o que é o padrão no cPanel e no Plesk.
+
+O `.htaccess` começa com ponto, e o gerenciador de arquivos do cPanel esconde esses arquivos. Para conferir se ele foi enviado, ligue "Show Hidden Files (dotfiles)" nas configurações do gerenciador.
+
+**Servidor próprio.** Com acesso à configuração do servidor, o repasse pode ser feito por ele mesmo, sem o PHP.
+
+Nginx, dentro do bloco `server` do painel:
+
+```nginx
+location /observer-api/staging/ {
+    proxy_pass https://dev-api-mercado-bitcoin.web3up.mobi/v1/external/observer/;
+    proxy_ssl_server_name on;
+    proxy_set_header Host dev-api-mercado-bitcoin.web3up.mobi;
+}
+
+location /observer-api/production/ {
+    proxy_pass https://dev-api-mercado-bitcoin.web3up.mobi/v1/external/observer/;
+    proxy_ssl_server_name on;
+    proxy_set_header Host dev-api-mercado-bitcoin.web3up.mobi;
+}
+```
+
+Apache, com os módulos `proxy`, `proxy_http` e `ssl` ativos, dentro do `VirtualHost` do painel:
+
+```apache
+SSLProxyEngine on
+ProxyPass        /observer-api/staging/    https://dev-api-mercado-bitcoin.web3up.mobi/v1/external/observer/
+ProxyPassReverse /observer-api/staging/    https://dev-api-mercado-bitcoin.web3up.mobi/v1/external/observer/
+ProxyPass        /observer-api/production/ https://dev-api-mercado-bitcoin.web3up.mobi/v1/external/observer/
+ProxyPassReverse /observer-api/production/ https://dev-api-mercado-bitcoin.web3up.mobi/v1/external/observer/
+```
+
+Se o `apiBaseUrl` de um ambiente mudar, a regra do servidor muda junto. As barras no fim dos dois lados importam: sem elas, o caminho chega errado à API.
+
+Para conferir, abra no navegador `https://<seu-painel>/observer-api/staging/funds`. Sem a chave, a resposta deve ser um JSON da API recusando a chamada, com HTTP 401. Se aparecer a página do painel ou um erro do servidor, a regra não está valendo. Sem a regra, a página de Sincronização mostra a mensagem "Sem acesso à Observer API". Com o PHP, um problema do próprio script volta como um JSON com o campo `error`, por exemplo quando falta o `observer-api.config.json` ou a extensão `curl`.
 
 ## De onde vêm os dados
 
@@ -106,7 +162,7 @@ Só a página de sincronização usa a Observer API, e ela pede a chave na tela.
 
 Sem a chave, as outras páginas funcionam normalmente, e a de sincronização mostra só o que já está atestado.
 
-**A Observer API precisa de um proxy.** A API não aceita os cabeçalhos `X-Observer-Id` e `X-Observer-Key` em chamadas feitas direto de um navegador. Por isso o painel chama o caminho `/observer-api/<ambiente>`, e o servidor repassa a chamada à API configurada no workflow do mesmo ambiente. O `npm run frontend:dev` e o `npm run frontend:preview` já fazem esse repasse, configurado em [vite.config.ts](vite.config.ts). Em uma hospedagem de arquivos estáticos, a página de sincronização só funciona se o servidor tiver uma regra equivalente. As outras páginas não dependem disso.
+**A Observer API precisa de um proxy.** A API não aceita os cabeçalhos `X-Observer-Id` e `X-Observer-Key` em chamadas feitas direto de um navegador. Por isso o painel chama o caminho `/observer-api/<ambiente>`, e o servidor repassa a chamada à API configurada no workflow do mesmo ambiente. O `npm run frontend:dev` e o `npm run frontend:preview` já fazem esse repasse, configurado em [vite.config.ts](vite.config.ts). Em outro servidor, a página de sincronização só funciona com uma regra equivalente, descrita em [Repasse para a Observer API](#repasse-para-a-observer-api). As outras páginas não dependem disso.
 
 ## Identidade visual
 

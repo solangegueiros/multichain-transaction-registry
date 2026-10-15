@@ -1,0 +1,6 @@
+# Apache (cPanel and similar shared hosting): sends the calls of the panel to the
+# Observer API through observer-api.php. See "Publicar" in frontend/README.md.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule ^observer-api/(staging|production)/(.*)$ observer-api.php?env=$1&path=$2 [QSA,L]
+</IfModule>

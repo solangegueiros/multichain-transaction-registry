@@ -1,6 +1,6 @@
 import react from "@vitejs/plugin-react";
 import { fileURLToPath } from "node:url";
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import productionWorkflow from "../workflow-registry/config/config.production.json";
 import stagingWorkflow from "../workflow-registry/config/config.staging.json";
 
@@ -20,8 +20,21 @@ const observerProxy = {
   "/observer-api/production": proxyTo(productionWorkflow.apiBaseUrl, "/observer-api/production"),
 };
 
+// On a host without a proxy of its own, public/observer-api.php does the same job. It
+// reads the API of each environment from this file, written next to it by the build.
+const observerApiConfig = {
+  name: "observer-api-config",
+  generateBundle() {
+    this.emitFile({
+      type: "asset",
+      fileName: "observer-api.config.json",
+      source: JSON.stringify({ staging: stagingWorkflow.apiBaseUrl, production: productionWorkflow.apiBaseUrl }, null, 2) + "\n",
+    });
+  },
+} satisfies Plugin;
+
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), observerApiConfig],
   resolve: {
     // The pages import code of ../workflow-registry/lib: it must use the viem installed here
     alias: { viem: fileURLToPath(new URL("./node_modules/viem", import.meta.url)) },
